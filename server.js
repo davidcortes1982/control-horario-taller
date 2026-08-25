@@ -6,27 +6,18 @@ const path = require('path');
 let serviceAccount;
 
 try {
-    if (process.env.FIREBASE_PRIVATE_KEY) {
-        // Construye el objeto de credenciales usando variables separadas (Ideal para Render)
-        serviceAccount = {
-            type: "service_account",
-            project_id: process.env.FIREBASE_PROJECT_ID,
-            private_key_id: "render_generated",
-            private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            client_email: process.env.FIREBASE_CLIENT_EMAIL,
-            client_id: "110725513170557863848",
-            auth_uri: "https://accounts.google.com/o/oauth2/auth",
-            token_uri: "https://oauth2.gserviceaccount.com/token",
-            auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-            client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.FIREBASE_CLIENT_EMAIL)}`,
-            universe_domain: "googleapis.com"
-        };
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        // Lee la variable de entorno en Render y limpia posibles saltos de línea o espacios
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT.trim());
+        console.log("✅ Credenciales cargadas correctamente desde la variable de entorno de Render.");
     } else {
-        // Lee el archivo local si estás en tu ordenador
+        // Si estamos en tu PC localmente
         serviceAccount = require('./serviceAccountKey.json');
+        console.log("✅ Credenciales cargadas correctamente desde el archivo local.");
     }
 } catch (error) {
-    console.error("❌ Error crítico al procesar las credenciales:", error.message);
+    console.error("❌ Error crítico al procesar las credenciales de Firebase:", error.message);
+    process.exit(1);
 }
 
 admin.initializeApp({
