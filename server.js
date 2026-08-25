@@ -1,27 +1,28 @@
 const express = require('express');
-const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, getDoc, setDoc, collection } = require('firebase/firestore');
+const admin = require('firebase-admin');
 const bcrypt = require('bcrypt');
 const path = require('path');
+
+// Cargar credenciales desde Render (variable de entorno) o desde el archivo local en tu PC
+let serviceAccount;
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+    serviceAccount = require('./serviceAccountKey.json');
+}
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
+console.log("Conectado correctamente a Firebase Firestore mediante Admin SDK.");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Configuración de Firebase usando variables de entorno de Render
-const firebaseConfig = {
-    apiKey: process.env.FIREBASE_API_KEY,
-    authDomain: `${process.env.FIREBASE_PROJECT_ID}.firebaseapp.com`,
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`,
-    appId: process.env.FIREBASE_APP_ID
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-console.log("Conectado correctamente a Firebase Firestore en la nube.");
 
 // Coordenadas de tus centros y radios en kilómetros
 const centros = {
@@ -50,18 +51,17 @@ app.post('/api/registro', async (req, res) => {
     }
 
     try {
-        // Limpiamos el email para usarlo como ID de documento válido en Firestore (sin caracteres extraños)
         const safeEmail = email.trim().toLowerCase();
-        const userRef = doc(db, 'usuarios', safeEmail);
-        const userSnap = await getDoc(userRef);
+        const userRef = db.collection('usuarios').doc(safeEmail);
+        const userSnap = await userRef.get();
 
-        if (userSnap.exists()) {
+        if (userSnap.exists) {
             return res.status(400).json({ error: "Este correo ya está registrado." });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        await setDoc(userRef, {
+        await userRef.set({
             email: safeEmail,
             password: hashedPassword,
             rol: 'operario'
@@ -69,7 +69,7 @@ app.post('/api/registro', async (req, res) => {
 
         res.json({ success: true, message: "Usuario registrado correctamente." });
     } catch (error) {
-        console.error("Error detallado al registrar usuario:", error);
+        console.error("Error al registrar usuario en Admin SDK:", error);
         res.status(500).json({ error: "Error interno en el servidor al registrar: " + error.message });
     }
 });
@@ -96,10 +96,10 @@ app.post('/api/fichar', async (req, res) => {
 
     try {
         const safeEmail = email.trim().toLowerCase();
-        const userRef = doc(db, 'usuarios', safeEmail);
-        const userSnap = await getDoc(userRef);
+        const userRef = db.collection('usuarios').doc(safeEmail);
+        const userSnap = await userRef.get();
 
-        if (!userSnap.exists()) {
+        if (!userSnap.exists) {
             return res.status(401).json({ error: "Credenciales incorrectas (Usuario no encontrado)." });
         }
 
@@ -111,9 +111,9 @@ app.post('/api/fichar', async (req, res) => {
         }
 
         const fechaActual = new Date().toISOString();
-        const fichajeRef = doc(collection(db, 'fichajes'));
+        const fichajeRef = db.collection('fichajes').doc();
         
-        await setDoc(fichajeRef, {
+        await fichajeRef.set({
             email: safeEmail,
             ubicacion: ubicacion,
             tipo: tipo,
@@ -130,7 +130,7 @@ app.post('/api/fichar', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error detallado al procesar el fichaje:", error);
+        console.error("Error al procesar el fichaje en Admin SDK:", error);
         res.status(500).json({ error: "Error al guardar el fichaje: " + error.message });
     }
 });
