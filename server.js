@@ -104,8 +104,7 @@ app.post('/api/fichar', (req, res) => {
                 }
                 res.json({ 
                     success: true, 
-                    message: `¡Fichaje de ${tipo} registrado con éxito en ${ubicacion} a las ${new.toLocaleTimeString()}!` 
-                });
+                    message: `¡Fichaje de ${tipo} registrado con éxito en ${ubicacion} a las ${new Date().toLocaleTimeString()}!`
             }
         );
     });
