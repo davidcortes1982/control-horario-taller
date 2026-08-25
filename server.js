@@ -3,11 +3,14 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcrypt');
 const path = require('path');
 
-// Cargar credenciales desde Render (variable de entorno) o desde el archivo local en tu PC
+// Inicializar Firebase Admin de forma inteligente
 let serviceAccount;
+
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Si estamos en Render (lee la variable de entorno)
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 } else {
+    // Si estamos en tu PC (lee el archivo que tienes a la izquierda)
     serviceAccount = require('./serviceAccountKey.json');
 }
 
