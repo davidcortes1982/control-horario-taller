@@ -138,6 +138,26 @@ app.post('/api/fichar', (req, res) => {
     });
 });
 
+// ==========================================
+// RUTA PARA CONSULTAR TODOS LOS FICHAJES (ADMIN)
+// ==========================================
+app.get('/api/fichajes', (req, res) => {
+    const query = `
+        SELECT fichajes.id, usuarios.nombre AS empleado, naves.nombre AS ubicacion, fichajes.tipo, fichajes.timestamp 
+        FROM fichajes 
+        JOIN usuarios ON fichajes.usuario_id = usuarios.id 
+        JOIN naves ON fichajes.nave_id = naves.id
+        ORDER BY fichajes.timestamp DESC
+    `;
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: 'Error al leer los fichajes de la base de datos.' });
+        }
+        res.status(200).json(rows);
+    });
+});
+
 // Arrancar el servidor
 app.listen(PORT, () => {
     console.log(`Servidor de control horario corriendo en el puerto ${PORT}`);
