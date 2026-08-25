@@ -20,11 +20,14 @@ try {
     process.exit(1);
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+// Asegurar compatibilidad con la importación de firebase-admin
+const firebaseAdmin = admin.default || admin;
+
+firebaseAdmin.initializeApp({
+  credential: firebaseAdmin.credential.cert(serviceAccount)
 });
 
-const db = admin.firestore();
+const db = firebaseAdmin.firestore();
 console.log("🔥 ¡Conectado correctamente a Firebase Firestore mediante Admin SDK!");
 
 const app = express();
