@@ -1,5 +1,6 @@
 const express = require('express');
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 const bcrypt = require('bcrypt');
 const path = require('path');
 
@@ -20,14 +21,12 @@ try {
     process.exit(1);
 }
 
-// Asegurar compatibilidad con la importación de firebase-admin
-const firebaseAdmin = admin.default || admin;
-
-firebaseAdmin.initializeApp({
-  credential: firebaseAdmin.credential.cert(serviceAccount)
+// Inicializar Firebase Admin usando las funciones directas
+initializeApp({
+  credential: cert(serviceAccount)
 });
 
-const db = firebaseAdmin.firestore();
+const db = getFirestore();
 console.log("🔥 ¡Conectado correctamente a Firebase Firestore mediante Admin SDK!");
 
 const app = express();
