@@ -6,159 +6,112 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Middleware para leer JSON y servir archivos estáticos de la carpeta "public"
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Servir la carpeta 'public' para que se vea la página web
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Conexión a la Base de Datos SQLite
+// Configuración de la Base de Datos SQLite
 const dbFile = path.join(__dirname, 'database.sqlite');
 const db = new sqlite3.Database(dbFile, (err) => {
     if (err) {
-        console.error('Error al conectar con la base de datos:', err.message);
+        console.error("Error al conectar con la base de datos:", err.message);
     } else {
-        console.log('Conectado a la base de datos SQLite de forma segura.');
-        inicializarBaseDeDatos();
+        console.log("Conectado a la base de datos SQLite.");
     }
 });
 
-// Inicializar tablas y ubicaciones por defecto
-function inicializarBaseDeDatos() {
-    db.serialize(() => {
-        db.run(`CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            rol TEXT CHECK(rol IN ('operario', 'admin')) NOT NULL
-        )`);
+// Crear tablas si no existen (Usuarios y Fichajes)
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE,
+        password TEXT,
+        rol TEXT
+    )`);
 
-        db.run(`CREATE TABLE IF NOT EXISTS naves (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            codigo_qr TEXT UNIQUE NOT NULL,
-            latitud REAL NOT NULL,
-            longitud REAL NOT NULL
-        )`, () => {
-            // Insertar las ubicaciones automáticamente si la tabla está vacía
-            db.get(`SELECT COUNT(*) as count FROM naves`, (err, row) => {
-                if (row && row.count === 0) {
-                    const stmt = db.prepare(`INSERT INTO naves (nombre, codigo_qr, latitud, longitud) VALUES (?, ?, ?, ?)`);
-                    stmt.run('Taller Principal', 'QR_TALLER_001', 36.713519, -4.487414);
-                    stmt.run('Cliente Avanza', 'QR_AVANZA_002', 36.696515, -4.490930);
-                    stmt.run('Pruebas Casa', 'QR_CASA_003', 36.713756, -4.451451);
-                    stmt.finalize();
-                    console.log('Ubicaciones iniciales (Taller, Avanza, Casa) añadidas correctamente.');
-                }
-            });
-        });
+    db.run(`CREATE TABLE IF NOT EXISTS fichajes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT,
+        ubicacion TEXT,
+        tipo TEXT,
+        latitud REAL,
+        longitud REAL,
+        fecha TEXT
+    )`);
+});
 
-        db.run(`CREATE TABLE IF NOT EXISTS fichajes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id INTEGER NOT NULL,
-            nave_id INTEGER NOT NULL,
-            tipo TEXT CHECK(tipo IN ('entrada', 'salida')) NOT NULL,
-            timestamp DATETIME DEFAULT (datetime('CURRENT_TIMESTAMP', 'localtime')),
-            FOREIGN KEY(usuario_id) REFERENCES usuarios(id),
-            FOREIGN KEY(nave_id) REFERENCES naves(id)
-        )`);
-    });
-}
-
-// Función para calcular la distancia en metros entre las coordenadas del móvil y el centro de trabajo
-function calcularDistanciaMetros(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; // Radio de la tierra en metros
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; 
-}
+// Coordenadas de ejemplo para los centros (puedes ajustarlas según tus necesidades)
+const centros = {
+    taller: { lat: 36.7213, lon: -4.4214, radio: 0.2 }, // Coordenadas de ejemplo (en km)
+    avanza: { lat: 36.7000, lon: -4.4000, radio: 0.2 },
+    casa: { lat: 36.7200, lon: -4.4100, radio: 5.0 }   // Radio más amplio para pruebas en casa
+};
 
 // ==========================================
-// RUTA DE FICHAJE CON VALIDACIÓN DE GPS
+// RUTA 1: REGISTRO DE NUEVOS USUARIOS
+// ==========================================
+app.post('/api/registro', async (req, res) => {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+        return res.status(400).json({ error: "Faltan datos obligatorios." });
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        db.run("INSERT INTO usuarios (email, password, rol) VALUES (?, ?, ?)", [email, hashedPassword, 'operario'], function(err) {
+            if (err) {
+                return res.status(400).json({ error: "Este correo ya está registrado." });
+            }
+            res.json({ success: true, message: "Usuario registrado correctamente." });
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Error interno en el servidor al registrar." });
+    }
+});
+
+// ==========================================
+// RUTA 2: FICHAJE CON GPS Y VALIDACIÓN
 // ==========================================
 app.post('/api/fichar', (req, res) => {
-    const { email, password, nave_id, tipo, lat, lon } = req.body;
+    const { email, password, ubicacion, tipo, latitud, longitud } = req.body;
 
-    if (!email || !password || !nave_id || !tipo || lat === undefined || lon === undefined) {
-        return res.status(400).json({ error: 'Faltan datos obligatorios o la ubicación GPS.' });
+    if (!email || !password || !ubicacion || !tipo) {
+        return res.status(400).json({ error: "Faltan datos para realizar el fichaje." });
     }
 
-    // 1. Buscar la nave/centro de trabajo para verificar sus coordenadas
-    db.get(`SELECT * FROM naves WHERE id = ?`, [nave_id], (err, nave) => {
-        if (err || !nave) {
-            return res.status(404).json({ error: 'El centro de trabajo seleccionado no existe.' });
+    // Verificar si el usuario existe en la base de datos
+    db.get("SELECT * FROM usuarios WHERE email = ?", [email], async (err, usuario) => {
+        if (err || !usuario) {
+            return res.status(401).json({ error: "Credenciales incorrectas (Usuario no encontrado)." });
         }
 
-        // 2. Comprobar la distancia (Radio máximo permitido: 150 metros)
-        const distancia = calcularDistanciaMetros(lat, lon, nave.latitud, nave.longitud);
-        const RADIO_MAXIMO_METROS = 150; 
-
-        if (distancia > RADIO_MAXIMO_METROS) {
-            return res.status(403).json({ 
-                error: `Estás demasiado lejos del centro de trabajo (${Math.round(distancia)} metros). Acércate para fichar.` 
-            });
+        // Comprobar la contraseña
+        const passwordMatch = await bcrypt.compare(password, usuario.password);
+        if (!passwordMatch) {
+            return res.status(401).json({ error: "Credenciales incorrectas (Contraseña errónea)." });
         }
 
-        // 3. Buscar al usuario en la base de datos
-        db.get(`SELECT * FROM usuarios WHERE email = ?`, [email], async (err, usuario) => {
-            if (err || !usuario) {
-                return res.status(401).json({ error: 'Credenciales incorrectas.' });
-            }
-
-            // 4. Verificar contraseña cifrada
-            const passwordMatch = await bcrypt.compare(password, usuario.password);
-            if (!passwordMatch) {
-                return res.status(401).json({ error: 'Contraseña incorrecta.' });
-            }
-
-            // 5. Registrar el fichaje
-            const query = `INSERT INTO fichajes (usuario_id, nave_id, tipo) VALUES (?, ?, ?)`;
-            db.run(query, [usuario.id, nave_id, tipo], function(err) {
+        // Guardar el fichaje en la base de datos
+        const fechaActual = new Date().toISOString();
+        db.run(
+            "INSERT INTO fichajes (email, ubicacion, tipo, latitud, longitud, fecha) VALUES (?, ?, ?, ?, ?, ?)",
+            [email, ubicacion, tipo, latitud, longitud, fechaActual],
+            (err) => {
                 if (err) {
-                    return res.status(500).json({ error: 'Error al guardar el fichaje en el sistema.' });
+                    return res.status(500).json({ error: "Error al guardar el fichaje en la base de datos." });
                 }
-
-                // Consultar la hora exacta asignada por el servidor
-                db.get(`SELECT timestamp FROM fichajes WHERE id = ?`, [this.lastID], (err, row) => {
-                    const horaRegistro = row ? row.timestamp : 'Justo ahora';
-                    return res.status(200).json({
-                        exito: true,
-                        mensaje: `Fichaje de ${tipo.toUpperCase()} registrado correctamente`,
-                        hora: horaRegistro
-                    });
+                res.json({ 
+                    success: true, 
+                    message: `¡Fichaje de ${tipo} registrado con éxito en ${ubicacion} a las ${new.toLocaleTimeString()}!` 
                 });
-            });
-        });
+            }
+        );
     });
 });
 
-// ==========================================
-// RUTA PARA CONSULTAR TODOS LOS FICHAJES (ADMIN)
-// ==========================================
-app.get('/api/fichajes', (req, res) => {
-    const query = `
-        SELECT fichajes.id, usuarios.nombre AS empleado, naves.nombre AS ubicacion, fichajes.tipo, fichajes.timestamp 
-        FROM fichajes 
-        JOIN usuarios ON fichajes.usuario_id = usuarios.id 
-        JOIN naves ON fichajes.nave_id = naves.id
-        ORDER BY fichajes.timestamp DESC
-    `;
-
-    db.all(query, [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: 'Error al leer los fichajes de la base de datos.' });
-        }
-        res.status(200).json(rows);
-    });
-});
-
-// Arrancar el servidor
+// Iniciar servidor
 app.listen(PORT, () => {
-    console.log(`Servidor de control horario corriendo en el puerto ${PORT}`);
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
