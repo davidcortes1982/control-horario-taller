@@ -39,7 +39,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const centros = {
     taller: { lat: 36.7213, lon: -4.4214, radioKm: 0.2 }, 
     avanza: { lat: 36.7000, lon: -4.4000, radioKm: 0.2 }, 
-    casa:   { lat: 36.7200, lon: -4.4100, radioKm: 3.0 }   
+    casa:   { lat: 36.713756, lon: -4.451451, radioKm: 3.0 }   
 };
 
 function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
