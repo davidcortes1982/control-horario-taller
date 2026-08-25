@@ -40,13 +40,6 @@ db.serialize(() => {
     )`);
 });
 
-// Coordenadas de ejemplo para los centros (puedes ajustarlas según tus necesidades)
-const centros = {
-    taller: { lat: 36.7213, lon: -4.4214, radio: 0.2 }, // Coordenadas de ejemplo (en km)
-    avanza: { lat: 36.7000, lon: -4.4000, radio: 0.2 },
-    casa: { lat: 36.7200, lon: -4.4100, radio: 5.0 }   // Radio más amplio para pruebas en casa
-};
-
 // ==========================================
 // RUTA 1: REGISTRO DE NUEVOS USUARIOS
 // ==========================================
@@ -104,7 +97,8 @@ app.post('/api/fichar', (req, res) => {
                 }
                 res.json({ 
                     success: true, 
-                    message: `¡Fichaje de ${tipo} registrado con éxito en ${ubicacion} a las ${new Date().toLocaleTimeString()}!`
+                    message: `¡Fichaje de ${tipo} registrado con éxito en ${ubicacion} a las ${new Date().toLocaleTimeString()}!` 
+                });
             }
         );
     });
