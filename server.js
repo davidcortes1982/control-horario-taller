@@ -45,9 +45,9 @@ db.serialize(() => {
 // IMPORTANTE: Cambia lat y lon por las coordenadas reales de cada sitio
 // ==========================================
 const centros = {
-    taller: { lat: 36.7213, lon: -4.4214, radioKm: 0.2 }, // 200 metros de radio para el taller
-    avanza: { lat: 36.7000, lon: -4.4000, radioKm: 0.2 }, // 200 metros de radio para Avanza
-    casa:   { lat: 36.7200, lon: -4.4100, radioKm: 3.0 }  // 3 kilómetros de radio para pruebas en casa (puedes moverte por el barrio)
+    taller: { lat: 36.713519, lon: -4.487414, radioKm: 0.2 }, // 200 metros de radio para el taller
+    avanza: { lat: 36.696515, lon: -4.490930, radioKm: 0.2 }, // 200 metros de radio para Avanza
+    casa:   { lat: 36.7137294, lon: -4.451408, radioKm: 3.0 }  // 3 kilómetros de radio para pruebas en casa (puedes moverte por el barrio)
 };
 
 // Función matemática (Haversine) para calcular la distancia en kilómetros entre dos coordenadas GPS
