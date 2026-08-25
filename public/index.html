@@ -1,183 +1,125 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Horario - Taller</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .container {
-            background: white;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-        h2, h3 {
-            color: #333;
-            text-align: center;
-        }
-        input, select, button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        .btn-registro {
-            background-color: #28a745;
-        }
-        .btn-registro:hover {
-            background-color: #218838;
-        }
-        #mensaje, #reg-mensaje {
-            text-align: center;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        .seccion {
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
-        }
-    </style>
-</head>
-<body>
+<!-- Sección de Historial Personal (Operario) -->
+<div style="margin-top: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+    <h3>Mis Fichajes (Operario)</h3>
+    <p style="font-size: 13px; color: #666;">Introduce tus credenciales para consultar tu propio registro de jornada.</p>
+    <input type="email" id="op-email" placeholder="Tu correo" style="padding: 6px; margin-right: 5px;">
+    <input type="password" id="op-password" placeholder="Tu contraseña" style="padding: 6px; margin-right: 5px;">
+    <button onclick="cargarMiHistorial()" style="padding: 6px 12px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">Ver mi historial</button>
+    
+    <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
+        <table border="1" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+                <tr style="background: #f1f1f1;">
+                    <th style="padding: 6px;">Centro</th>
+                    <th style="padding: 6px;">Tipo</th>
+                    <th style="padding: 6px;">Fecha y Hora</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-mi-historial-body"></tbody>
+        </table>
+    </div>
+</div>
 
-<div class="container">
-    <h2>Control Horario</h2>
-
-    <!-- INICIO DE SESIÓN Y FICHAJE -->
-    <div class="seccion">
-        <h3>Iniciar Sesión y Fichar</h3>
-        <input type="email" id="email" placeholder="Correo electrónico">
-        <input type="password" id="password" placeholder="Contraseña">
-
-        <label for="ubicacion">Centro de Trabajo:</label>
-        <select id="ubicacion">
-            <option value="taller">Taller Principal</option>
-            <option value="avanza">Avanza</option>
-            <option value="casa">Pruebas Casa</option>
-        </select>
-
-        <label for="tipo">Tipo de Fichaje:</label>
-        <select id="tipo">
-            <option value="entrada">Entrada</option>
-            <option value="salida">Salida</option>
-        </select>
-
-        <button onclick="fichar()">Fichar con GPS</button>
-        <p id="mensaje"></p>
+<!-- Sección de Panel de Inspección (Empresario) -->
+<div style="margin-top: 30px; padding: 20px; border: 2px dashed #007bff; border-radius: 8px; background: #f9fbfd;">
+    <h3 style="color: #007bff;">Panel de Inspección y Control Global (Empresario)</h3>
+    <p style="font-size: 13px; color: #666;">Acceso restringido para el cumplimiento de las obligaciones legales y de inspección.</p>
+    <div style="margin-bottom: 15px;">
+        <input type="password" id="admin-password" placeholder="Contraseña de empresario" style="padding: 8px; margin-right: 5px;">
+        <button onclick="cargarFichajesEmpresario()" style="padding: 8px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Cargar Todos los Registros</button>
+        <button onclick="exportarCSV()" style="padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Exportar para Inspección (CSV)</button>
     </div>
 
-    <!-- REGISTRO DE NUEVOS USUARIOS -->
-    <div>
-        <h3>¿No tienes cuenta? Regístrate</h3>
-        <input type="email" id="reg-email" placeholder="Correo electrónico">
-        <input type="password" id="reg-password" placeholder="Contraseña">
-        <button class="btn-registro" onclick="registrarUsuario()">Crear Cuenta</button>
-        <p id="reg-mensaje"></p>
+    <div style="max-height: 250px; overflow-y: auto;">
+        <table border="1" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+                <tr style="background: #e9ecef;">
+                    <th style="padding: 6px;">Correo</th>
+                    <th style="padding: 6px;">Centro</th>
+                    <th style="padding: 6px;">Tipo</th>
+                    <th style="padding: 6px;">Fecha y Hora</th>
+                    <th style="padding: 6px;">GPS</th>
+                </tr>
+            </thead>
+            <tbody id="lista-fichajes-body"></tbody>
+        </table>
     </div>
 </div>
 
 <script>
-    // Función para Fichar
-    async function fichar() {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const ubicacion = document.getElementById('ubicacion').value;
-        const tipo = document.getElementById('tipo').value;
-        const mensaje = document.getElementById('mensaje');
+    let fichajesGlobalesEmpresario = [];
 
-        mensaje.style.color = '#333';
-        mensaje.textContent = "Obteniendo ubicación GPS...";
-
-        if (!navigator.geolocation) {
-            mensaje.style.color = 'red';
-            mensaje.textContent = "Tu navegador no soporta geolocalización.";
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(async (position) => {
-            const latitud = position.coords.latitude;
-            const longitud = position.coords.longitude;
-
-            mensaje.textContent = "Enviando fichaje...";
-
-            try {
-                const respuesta = await fetch('/api/fichar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, ubicacion, tipo, latitud, longitud })
-                });
-
-                const resultado = await respuesta.json();
-
-                if (respuesta.ok) {
-                    mensaje.style.color = 'green';
-                    mensaje.textContent = resultado.message;
-                } else {
-                    mensaje.style.color = 'red';
-                    mensaje.textContent = resultado.error || "Error al fichar";
-                }
-            } catch (error) {
-                mensaje.style.color = 'red';
-                mensaje.textContent = "Error de conexión con el servidor.";
-            }
-        }, (error) => {
-            mensaje.style.color = 'red';
-            mensaje.textContent = "No se pudo obtener el GPS. Activa la ubicación en tu dispositivo.";
-        }, { enableHighAccuracy: true });
-    }
-
-    // Función para Registrar Usuario
-    async function registrarUsuario() {
-        const email = document.getElementById('reg-email').value;
-        const password = document.getElementById('reg-password').value;
-        const mensaje = document.getElementById('reg-mensaje');
+    async function cargarMiHistorial() {
+        const email = document.getElementById('op-email').value;
+        const password = document.getElementById('op-password').value;
 
         try {
-            const respuesta = await fetch('/api/registro', {
+            const res = await fetch('/api/operario/historial', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error); return; }
 
-            const resultado = await respuesta.json();
-            if (respuesta.ok) {
-                mensaje.style.color = 'green';
-                mensaje.textContent = "¡Registrado con éxito! Ya puedes iniciar sesión arriba.";
-            } else {
-                mensaje.style.color = 'red';
-                mensaje.textContent = resultado.error || "Error al registrarse";
-            }
-        } catch (error) {
-            mensaje.style.color = 'red';
-            mensaje.textContent = "Error de conexión con el servidor.";
+            const tbody = document.getElementById('tabla-mi-historial-body');
+            tbody.innerHTML = '';
+            data.fichajes.forEach(f => {
+                tbody.innerHTML += `<tr>
+                    <td style="padding: 5px;">${f.ubicacion}</td>
+                    <td style="padding: 5px;"><b>${f.tipo}</b></td>
+                    <td style="padding: 5px;">${new Date(f.fecha).toLocaleString('es-ES')}</td>
+                </tr>`;
+            });
+        } catch (e) {
+            alert("Error al conectar con el servidor.");
         }
     }
-</script>
 
-</body>
-</html>
+    async function cargarFichajesEmpresario() {
+        const password = document.getElementById('admin-password').value;
+        try {
+            const res = await fetch('/api/empresario/fichajes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error); return; }
+
+            fichajesGlobalesEmpresario = data.fichajes;
+            const tbody = document.getElementById('lista-fichajes-body');
+            tbody.innerHTML = '';
+            data.fichajes.forEach(f => {
+                tbody.innerHTML += `<tr>
+                    <td style="padding: 5px;">${f.email}</td>
+                    <td style="padding: 5px;">${f.ubicacion}</td>
+                    <td style="padding: 5px;"><b>${f.tipo}</b></td>
+                    <td style="padding: 5px;">${new Date(f.fecha).toLocaleString('es-ES')}</td>
+                    <td style="padding: 5px; font-size: 10px;">${f.latitud}, ${f.longitud}</td>
+                </tr>`;
+            });
+            alert("Datos globales cargados correctamente.");
+        } catch (e) {
+            alert("Error de conexión.");
+        }
+    }
+
+    function exportarCSV() {
+        if (fichajesGlobalesEmpresario.length === 0) {
+            alert("Primero debes cargar los fichajes con la contraseña de empresario.");
+            return;
+        }
+        let csvContent = "data:text/csv;charset=utf-8,Correo,Centro,Tipo,FechaHora,Latitud,Longitud\r\n";
+        fichajesGlobalesEmpresario.forEach(f => {
+            csvContent += [f.email, f.ubicacion, f.tipo, f.fecha, f.latitud, f.longitud].join(",") + "\r\n";
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `inspeccion_fichajes_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
