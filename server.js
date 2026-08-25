@@ -3,15 +3,24 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcrypt');
 const path = require('path');
 
-// Inicializar Firebase Admin de forma inteligente
 let serviceAccount;
 
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    // Si estamos en Render (lee la variable de entorno)
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-} else {
-    // Si estamos en tu PC (lee el archivo que tienes a la izquierda)
-    serviceAccount = require('./serviceAccountKey.json');
+try {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        // Lee la variable de entorno en Render y limpia posibles saltos de línea
+        const rawConfig = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+        serviceAccount = JSON.parse(rawConfig);
+    } else {
+        // Lee el archivo local si estás en tu ordenador
+        serviceAccount = require('./serviceAccountKey.json');
+    }
+} catch (error) {
+    console.error("❌ Error crítico al procesar las credenciales de Firebase:", error.message);
+}
+
+if (!serviceAccount) {
+    console.error("❌ ERROR: No se ha podido cargar ninguna credencial de Firebase. Revisa las variables de entorno en Render.");
+    process.exit(1); // Detiene la app limpiamente para ver el error
 }
 
 admin.initializeApp({
@@ -19,7 +28,7 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-console.log("Conectado correctamente a Firebase Firestore mediante Admin SDK.");
+console.log("🔥 ¡Conectado correctamente a Firebase Firestore mediante Admin SDK!");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
