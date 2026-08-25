@@ -7,16 +7,16 @@ let serviceAccount;
 
 try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        // Lee la variable de entorno en Render y limpia posibles saltos de línea o espacios
+        console.log("🔍 Detectada variable de entorno en Render. Procesando...");
         serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT.trim());
-        console.log("✅ Credenciales cargadas correctamente desde la variable de entorno de Render.");
+        console.log("✅ Credenciales parseadas con éxito desde Render.");
     } else {
-        // Si estamos en tu PC localmente
+        console.log("🔍 No hay variable de entorno, buscando archivo local...");
         serviceAccount = require('./serviceAccountKey.json');
-        console.log("✅ Credenciales cargadas correctamente desde el archivo local.");
+        console.log("✅ Credenciales cargadas desde archivo local.");
     }
 } catch (error) {
-    console.error("❌ Error crítico al procesar las credenciales de Firebase:", error.message);
+    console.error("❌ ERROR CRÍTICO AL LEER LAS CREDENCIALES:", error.message);
     process.exit(1);
 }
 
