@@ -1,6 +1,6 @@
 const express = require('express');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, doc, setDoc, getDoc } = require('firebase/firestore');
+const { getFirestore, doc, getDoc, setDoc, collection } = require('firebase/firestore');
 const bcrypt = require('bcrypt');
 const path = require('path');
 
@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de Firebase usando las variables de entorno de Render
+// Configuración de Firebase usando variables de entorno de Render
 const firebaseConfig = {
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: `${process.env.FIREBASE_PROJECT_ID}.firebaseapp.com`,
@@ -50,7 +50,9 @@ app.post('/api/registro', async (req, res) => {
     }
 
     try {
-        const userRef = doc(db, 'usuarios', email);
+        // Limpiamos el email para usarlo como ID de documento válido en Firestore (sin caracteres extraños)
+        const safeEmail = email.trim().toLowerCase();
+        const userRef = doc(db, 'usuarios', safeEmail);
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
@@ -60,15 +62,15 @@ app.post('/api/registro', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         
         await setDoc(userRef, {
-            email: email,
+            email: safeEmail,
             password: hashedPassword,
             rol: 'operario'
         });
 
         res.json({ success: true, message: "Usuario registrado correctamente." });
     } catch (error) {
-        console.error("Error al registrar usuario:", error);
-        res.status(500).json({ error: "Error interno en el servidor al registrar." });
+        console.error("Error detallado al registrar usuario:", error);
+        res.status(500).json({ error: "Error interno en el servidor al registrar: " + error.message });
     }
 });
 
@@ -93,7 +95,8 @@ app.post('/api/fichar', async (req, res) => {
     }
 
     try {
-        const userRef = doc(db, 'usuarios', email);
+        const safeEmail = email.trim().toLowerCase();
+        const userRef = doc(db, 'usuarios', safeEmail);
         const userSnap = await getDoc(userRef);
 
         if (!userSnap.exists()) {
@@ -111,7 +114,7 @@ app.post('/api/fichar', async (req, res) => {
         const fichajeRef = doc(collection(db, 'fichajes'));
         
         await setDoc(fichajeRef, {
-            email: email,
+            email: safeEmail,
             ubicacion: ubicacion,
             tipo: tipo,
             latitud: latitud,
@@ -127,8 +130,8 @@ app.post('/api/fichar', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error al procesar el fichaje:", error);
-        res.status(500).json({ error: "Error al guardar el fichaje en la base de datos." });
+        console.error("Error detallado al procesar el fichaje:", error);
+        res.status(500).json({ error: "Error al guardar el fichaje: " + error.message });
     }
 });
 
