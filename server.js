@@ -95,9 +95,13 @@ app.post('/api/fichar', (req, res) => {
                 if (err) {
                     return res.status(500).json({ error: "Error al guardar el fichaje en la base de datos." });
                 }
+                
+                // Hora local exacta de España
+                const horaEspana = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
+
                 res.json({ 
                     success: true, 
-                    message: `¡Fichaje de ${tipo} registrado con éxito en ${ubicacion} a las ${new Date().toLocaleTimeString()}!` 
+                    message: `¡Fichaje de ${tipo} registrado con éxito en ${ubicacion} a las ${horaEspana}!` 
                 });
             }
         );
