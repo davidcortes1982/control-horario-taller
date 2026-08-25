@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Horario - Fichaje</title>
+    <!-- Usamos Tailwind CSS para que se vea moderno y adaptado al móvil -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen justify-between">
+
+    <header class="bg-blue-600 text-white p-4 text-center shadow-md">
+        <h1 class="text-xl font-bold">Control Horario Taller</h1>
+        <p class="text-sm opacity-90">Registro legal de jornada</p>
+    </header>
+
+    <main class="p-4 max-w-md mx-auto w-full flex-grow flex flex-col justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-lg font-semibold mb-4 text-gray-700 text-center">Identificación de Fichaje</h2>
+            
+            <form id="formFichaje" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Correo Electrónico</label>
+                    <input type="email" id="email" required class="w-full mt-1 p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="juan@taller.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Contraseña</label>
+                    <input type="password" id="password" required class="w-full mt-1 p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="******">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Código del QR (o selección)</label>
+                    <select id="nave_id" class="w-full mt-1 p-2 border rounded-md bg-white">
+                        <option value="1">Nave Principal - Chapa</option>
+                        <option value="2">Instalaciones Cliente Externo</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Simulado mediante selección (pronto usaremos la cámara para escanear el QR real).</p>
+                </div>
+
+                <div class="flex gap-4 pt-2">
+                    <button type="button" onclick="fichar('entrada')" class="w-full bg-green-600 text-white p-3 rounded-md font-semibold hover:bg-green-700 transition">Fichar ENTRADA</button>
+                    <button type="button" onclick="fichar('salida')" class="w-full bg-red-600 text-white p-3 rounded-md font-semibold hover:bg-red-700 transition">Fichar SALIDA</button>
+                </div>
+            </form>
+
+            <div id="mensaje" class="mt-4 text-center text-sm font-medium"></div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-200 text-center p-3 text-xs text-gray-600">
+        Cumple con el Real Decreto-ley 8/2019 de control horario.
+    </footer>
+
+    <script>
+        async function fichar(tipo) {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const nave_id = document.getElementById('nave_id').value;
+            const mensajeDiv = document.getElementById('mensaje');
+
+            if (!email || !password) {
+                mensajeDiv.className = 'mt-4 text-center text-sm font-medium text-red-600';
+                mensajeDiv.innerText = 'Por favor, introduce tu correo y contraseña.';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/fichar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, nave_id, tipo })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    mensajeDiv.className = 'mt-4 text-center text-sm font-medium text-green-600';
+                    mensajeDiv.innerText = data.mensaje + ' (' + data.hora + ')';
+                } else {
+                    mensajeDiv.className = 'mt-4 text-center text-sm font-medium text-red-600';
+                    mensajeDiv.innerText = data.error || 'Error al realizar el fichaje.';
+                }
+            } catch (error) {
+                mensajeDiv.className = 'mt-4 text-center text-sm font-medium text-red-600';
+                mensajeDiv.innerText = 'Error de conexión con el servidor.';
+            }
+        }
+    </script>
+</body>
+</html>
