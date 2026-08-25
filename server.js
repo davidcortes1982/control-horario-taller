@@ -41,6 +41,29 @@ db.serialize(() => {
 });
 
 // ==========================================
+// CONFIGURACIÓN DE CENTROS Y RADIOS (en kilómetros)
+// IMPORTANTE: Cambia lat y lon por las coordenadas reales de cada sitio
+// ==========================================
+const centros = {
+    taller: { lat: 36.7213, lon: -4.4214, radioKm: 0.2 }, // 200 metros de radio para el taller
+    avanza: { lat: 36.7000, lon: -4.4000, radioKm: 0.2 }, // 200 metros de radio para Avanza
+    casa:   { lat: 36.7200, lon: -4.4100, radioKm: 3.0 }  // 3 kilómetros de radio para pruebas en casa (puedes moverte por el barrio)
+};
+
+// Función matemática (Haversine) para calcular la distancia en kilómetros entre dos coordenadas GPS
+function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radio de la Tierra en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distancia en kilómetros
+}
+
+// ==========================================
 // RUTA 1: REGISTRO DE NUEVOS USUARIOS
 // ==========================================
 app.post('/api/registro', async (req, res) => {
@@ -65,28 +88,44 @@ app.post('/api/registro', async (req, res) => {
 });
 
 // ==========================================
-// RUTA 2: FICHAJE CON GPS Y VALIDACIÓN
+// RUTA 2: FICHAJE CON GPS Y VALIDACIÓN DE DISTANCIA
 // ==========================================
 app.post('/api/fichar', (req, res) => {
     const { email, password, ubicacion, tipo, latitud, longitud } = req.body;
 
-    if (!email || !password || !ubicacion || !tipo) {
-        return res.status(400).json({ error: "Faltan datos para realizar el fichaje." });
+    if (!email || !password || !ubicacion || !tipo || latitud === undefined || longitud === undefined) {
+        return res.status(400).json({ error: "Faltan datos o coordenadas GPS para realizar el fichaje." });
     }
 
-    // Verificar si el usuario existe en la base de datos
+    // 1. Validar si el centro seleccionado existe en nuestra lista
+    const centroPermitido = centros[ubicacion];
+    if (!centroPermitido) {
+        return res.status(400).json({ error: "Centro de trabajo no válido." });
+    }
+
+    // 2. Calcular la distancia real entre el móvil y el centro seleccionado
+    const distanciaCalculadaKm = calcularDistanciaKm(latitud, longitud, centroPermitido.lat, centroPermitido.lon);
+
+    // 3. Comprobar si está fuera del radio permitido
+    if (distanciaCalculadaKm > centroPermitido.radioKm) {
+        const distanciaMetros = Math.round(distanciaCalculadaKm * 1000);
+        return res.status(403).json({ 
+            error: `Fichaje rechazado. Estás demasiado lejos de ${ubicacion.toUpperCase()} (a unos ${distanciaMetros} metros). Acércate a la zona permitida.` 
+        });
+    }
+
+    // 4. Verificar usuario y contraseña en la base de datos
     db.get("SELECT * FROM usuarios WHERE email = ?", [email], async (err, usuario) => {
         if (err || !usuario) {
             return res.status(401).json({ error: "Credenciales incorrectas (Usuario no encontrado)." });
         }
 
-        // Comprobar la contraseña
         const passwordMatch = await bcrypt.compare(password, usuario.password);
         if (!passwordMatch) {
             return res.status(401).json({ error: "Credenciales incorrectas (Contraseña errónea)." });
         }
 
-        // Guardar el fichaje en la base de datos
+        // 5. Si todo es correcto, guardar el fichaje
         const fechaActual = new Date().toISOString();
         db.run(
             "INSERT INTO fichajes (email, ubicacion, tipo, latitud, longitud, fecha) VALUES (?, ?, ?, ?, ?, ?)",
@@ -96,7 +135,6 @@ app.post('/api/fichar', (req, res) => {
                     return res.status(500).json({ error: "Error al guardar el fichaje en la base de datos." });
                 }
                 
-                // Hora local exacta de España
                 const horaEspana = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
 
                 res.json({ 
