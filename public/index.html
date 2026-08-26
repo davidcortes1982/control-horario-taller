@@ -55,6 +55,7 @@
         .btn-primary { background-color: #007bff; }
         .btn-success { background-color: #28a745; }
         .btn-info { background-color: #17a2b8; }
+        .btn-pdf { background-color: #dc3545; }
 
         button:active {
             opacity: 0.8;
@@ -82,6 +83,32 @@
 
         th {
             background-color: #f1f1f1;
+        }
+
+        /* Estilos específicos para cuando se imprima o guarde como PDF */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .seccion-card:not(#panel-empresario) {
+                display: none; /* Oculta lo demás al imprimir el informe */
+            }
+            #panel-empresario {
+                border: none !important;
+                box-shadow: none !important;
+                margin: 0;
+                padding: 0;
+            }
+            button, input {
+                display: none !important; /* Oculta botones e inputs en el PDF */
+            }
+            table {
+                font-size: 11px;
+            }
+            th, td {
+                border: 1px solid #333 !important;
+            }
         }
     </style>
 </head>
@@ -134,13 +161,13 @@
         </div>
     </div>
 
-    <!-- Sección de Panel de Inspección (Empresario - Sin Coordenadas) -->
-    <div class="seccion-card" style="border: 2px dashed #007bff;">
+    <!-- Sección de Panel de Inspección (Empresario) -->
+    <div class="seccion-card" id="panel-empresario" style="border: 2px dashed #007bff;">
         <h3 style="color: #007bff;">Panel de Inspección Global (Empresario)</h3>
         <p style="font-size: 12px; color: #666;">Acceso restringido para cumplimiento legal e inspecciones.</p>
         <input type="password" id="admin-password" placeholder="Contraseña de empresario">
         <button class="btn-primary" onclick="cargarFichajesEmpresario()">Cargar Todos los Registros</button>
-        <button class="btn-success" onclick="exportarCSV()">Exportar para Inspección (CSV)</button>
+        <button class="btn-pdf" onclick="exportarPDF()">Imprimir / Guardar Informe PDF</button>
 
         <div class="table-responsive">
             <table>
@@ -289,7 +316,7 @@
 
                 fichajesGlobalesEmpresario = data.fichajes;
                 const tbody = document.getElementById('lista-fichajes-body');
-                tbody.innerHTML = '';
+                tbody.innerHTML =';
                 data.fichajes.forEach(f => {
                     tbody.innerHTML += `<tr>
                         <td>${f.dni}</td>
@@ -305,24 +332,13 @@
             }
         }
 
-        function exportarCSV() {
+        function exportarPDF() {
             if (fichajesGlobalesEmpresario.length === 0) {
                 alert("Primero carga los registros con la contraseña de empresario.");
                 return;
             }
-            // Cabecera CSV sin latitud ni longitud
-            let csvContent = "data:text/csv;charset=utf-8,DNI,Nombre,Centro,Tipo,FechaHora\r\n";
-            fichajesGlobalesEmpresario.forEach(f => {
-                let nombreLimpio = f.nombre ? f.nombre.replace(/,/g, "") : "";
-                csvContent += [f.dni, nombreLimpio, f.ubicacion, f.tipo, f.fecha].join(",") + "\r\n";
-            });
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `inspeccion_fichajes_${new Date().toISOString().slice(0,10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Abre la ventana de impresión del navegador, donde seleccionas "Guardar como PDF"
+            window.print();
         }
     </script>
 </body>
