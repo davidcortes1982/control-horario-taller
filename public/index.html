@@ -175,6 +175,7 @@
 
         <button class="btn-success" onclick="realizarFichaje()">Fichar Ahora</button>
         <button class="btn-primary" onclick="registrarUsuario()">Registrarse (Nuevo)</button>
+        <button class="btn-secondary" onclick="olvidarDatosRegistro()">Borrar mis datos de registro</button>
         <p id="mensaje-estado" style="font-weight: bold; margin-top: 10px; font-size: 14px;"></p>
     </div>
 
@@ -331,6 +332,16 @@
             document.getElementById('op-password').value = '';
             document.getElementById('tabla-mi-historial-body').innerHTML = '';
             alert("Se han borrado los datos del historial de este dispositivo.");
+        }
+
+        function olvidarDatosRegistro() {
+            localStorage.removeItem('taller_dni');
+            localStorage.removeItem('taller_pass');
+            document.getElementById('dni').value = '';
+            document.getElementById('nombre').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('mensaje-estado').innerText = '';
+            alert("Se han borrado los datos de registro de este dispositivo.");
         }
 
         function realizarFichaje() {
