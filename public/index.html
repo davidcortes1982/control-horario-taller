@@ -91,12 +91,10 @@
             background-color: #f1f1f1;
         }
 
-        /* Oculto por defecto en la web normal, se muestra al imprimir */
         .print-header {
             display: none;
         }
 
-        /* Modal simple para correcciones */
         .modal {
             display: none;
             position: fixed;
@@ -133,7 +131,6 @@
             button, input, select, .modal, .no-print {
                 display: none !important;
             }
-            /* FUERZA QUE LA CABECERA DEL INFORME APAREZCA EN EL PDF */
             .print-header {
                 display: block !important;
                 visibility: visible !important;
@@ -168,7 +165,6 @@
         <select id="ubicacion">
             <option value="taller">Taller Principal</option>
             <option value="avanza">Centro Avanza</option>
-            <option value="casa">Remoto / Casa</option>
         </select>
 
         <select id="tipo">
@@ -178,17 +174,17 @@
 
         <button class="btn-success" onclick="realizarFichaje()">Fichar Ahora</button>
         <button class="btn-primary" onclick="registrarUsuario()">Registrarse (Nuevo)</button>
-        <button class="btn-secondary" onclick="olvidarCredencialesOperario()">Olvidar mis datos guardados en este móvil</button>
         <p id="mensaje-estado" style="font-weight: bold; margin-top: 10px; font-size: 14px;"></p>
     </div>
 
     <!-- Sección de Historial Personal (Operario) -->
     <div class="seccion-card no-print">
         <h3>Mis Fichajes (Operario)</h3>
-        <p style="font-size: 12px; color: #666;">Tus datos se autocompletan solos.</p>
-        <input type="text" id="op-dni" placeholder="Tu DNI" readonly style="background-color: #e9ecef;">
-        <input type="password" id="op-password" placeholder="Tu contraseña" readonly style="background-color: #e9ecef;">
+        <p style="font-size: 12px; color: #666;">Introduce tus datos para consultar tu historial o pedir correcciones.</p>
+        <input type="text" id="op-dni" placeholder="Tu DNI / NIE">
+        <input type="password" id="op-password" placeholder="Tu contraseña">
         <button class="btn-info" onclick="cargarMiHistorial()">Ver Mi Historial</button>
+        <button class="btn-secondary" onclick="olvidarCredencialesOperario()">Borrar mis datos guardados</button>
         
         <div class="table-responsive">
             <table>
@@ -208,7 +204,6 @@
     <!-- Sección de Panel de Inspección (Empresario) -->
     <div class="seccion-card" id="panel-empresario" style="border: 2px dashed #007bff;">
         
-        <!-- CABECERA EXCLUSIVA PARA IMPRESIÓN PDF -->
         <div class="print-header">
             <h2 style="margin: 0 0 5px 0; color: #000;">INFORME OFICIAL DE CONTROL HORARIO</h2>
             <p id="print-info-mes" style="margin: 0 0 3px 0; font-size: 14px; font-weight: bold;"></p>
@@ -289,17 +284,24 @@
         let solicitudesGlobalesEmpresario = [];
 
         window.onload = function() {
+            // Recuperar datos guardados para el fichaje y para el historial de forma independiente
             const savedDni = localStorage.getItem('taller_dni');
             const savedPass = localStorage.getItem('taller_pass');
+            const savedOpDni = localStorage.getItem('taller_op_dni');
+            const savedOpPass = localStorage.getItem('taller_op_pass');
             const savedAdminPass = localStorage.getItem('taller_admin_pass');
 
             if (savedDni) {
                 document.getElementById('dni').value = savedDni;
-                document.getElementById('op-dni').value = savedDni;
             }
             if (savedPass) {
                 document.getElementById('password').value = savedPass;
-                document.getElementById('op-password').value = savedPass;
+            }
+            if (savedOpDni) {
+                document.getElementById('op-dni').value = savedOpDni;
+            }
+            if (savedOpPass) {
+                document.getElementById('op-password').value = savedOpPass;
             }
             if (savedAdminPass) {
                 document.getElementById('admin-password').value = savedAdminPass;
@@ -311,21 +313,23 @@
             document.getElementById('filtro-mes').value = `${year}-${month}`;
         };
 
-        function guardarDatosLocalmente(dni, password) {
+        function guardarDatosFichaje(dni, password) {
             localStorage.setItem('taller_dni', dni.trim().toUpperCase());
             localStorage.setItem('taller_pass', password);
-            document.getElementById('op-dni').value = dni.trim().toUpperCase();
-            document.getElementById('op-password').value = password;
+        }
+
+        function guardarDatosHistorial(dni, password) {
+            localStorage.setItem('taller_op_dni', dni.trim().toUpperCase());
+            localStorage.setItem('taller_op_pass', password);
         }
 
         function olvidarCredencialesOperario() {
-            localStorage.removeItem('taller_dni');
-            localStorage.removeItem('taller_pass');
-            document.getElementById('dni').value = '';
-            document.getElementById('password').value = '';
+            localStorage.removeItem('taller_op_dni');
+            localStorage.removeItem('taller_op_pass');
             document.getElementById('op-dni').value = '';
             document.getElementById('op-password').value = '';
-            alert("Se han borrado los datos guardados en este dispositivo.");
+            document.getElementById('tabla-mi-historial-body').innerHTML = '';
+            alert("Se han borrado los datos del historial de este dispositivo.");
         }
 
         function realizarFichaje() {
@@ -366,7 +370,12 @@
                         return;
                     }
 
-                    guardarDatosLocalmente(dni, password);
+                    guardarDatosFichaje(dni, password);
+                    // Opcionalmente auto-sincronizamos también el historial con estos mismos datos por comodidad
+                    guardarDatosHistorial(dni, password);
+                    document.getElementById('op-dni').value = dni.trim().toUpperCase();
+                    document.getElementById('op-password').value = password;
+
                     msg.style.color = "green";
                     msg.innerText = data.message;
                 } catch (e) {
@@ -404,7 +413,11 @@
                     return;
                 }
 
-                guardarDatosLocalmente(dni, password);
+                guardarDatosFichaje(dni, password);
+                guardarDatosHistorial(dni, password);
+                document.getElementById('op-dni').value = dni.trim().toUpperCase();
+                document.getElementById('op-password').value = password;
+
                 msg.style.color = "green";
                 msg.innerText = data.message;
             } catch (e) {
@@ -418,7 +431,7 @@
             const password = document.getElementById('op-password').value;
 
             if (!dni || !password) {
-                alert("No hay credenciales guardadas. Realiza un fichaje primero.");
+                alert("Introduce tu DNI y contraseña para ver tu historial.");
                 return;
             }
 
@@ -431,8 +444,15 @@
                 const data = await res.json();
                 if (!res.ok) { alert(data.error); return; }
 
+                guardarDatosHistorial(dni, password);
+
                 const tbody = document.getElementById('tabla-mi-historial-body');
                 tbody.innerHTML = '';
+                if (data.fichajes.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#666;">No hay fichajes registrados todavía.</td></tr>`;
+                    return;
+                }
+
                 data.fichajes.forEach(f => {
                     let notaModif = f.modificadoPorEmpresario ? '<br><small style="color:green;">(Corregido y Aprobado)</small>' : '';
                     tbody.innerHTML += `<tr>
@@ -483,6 +503,7 @@
 
                 alert(data.message);
                 cerrarModal();
+                cargarMiHistorial(); // Refrescar la tabla
             } catch (e) {
                 alert("Error al enviar la solicitud.");
             }
