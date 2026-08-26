@@ -1,175 +1,244 @@
 const express = require('express');
+const bodyParser = require('body-parser');
+const path = require('path');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-const bcrypt = require('bcrypt');
-const path = require('path');
 
+// Cargar credenciales de Firebase desde variables de entorno (Render) o archivo local (desarrollo)
 let serviceAccount;
-
-try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT.trim());
-    } else {
-        serviceAccount = require('./serviceAccountKey.json');
-    }
-} catch (error) {
-    console.error("❌ ERROR CRÍTICO AL LEER LAS CREDENCIALES:", error.message);
-    process.exit(1);
+if (process.env.FIREBASE_CREDENTIALS) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+} else {
+    serviceAccount = require('./serviceAccountKey.json');
 }
 
 initializeApp({
-  credential: cert(serviceAccount)
+    credential: cert(serviceAccount)
 });
 
 const db = getFirestore();
-console.log("🔥 ¡Conectado correctamente a Firebase Firestore mediante Admin SDK!");
-
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Coordenadas de tus centros y radios en kilómetros
-const centros = {
-    taller: { lat: 36.713519, lon: -4.487414, radioKm: 0.2 }, 
-    avanza: { lat: 36.696515, lon: -4.490930, radioKm: 0.2 }, 
-    casa:   { lat: 36.713756, lon: -4.451451, radioKm: 3.0 }   
-};
+// Contraseña de empresario fija
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin1234";
 
-function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
-    const R = 6371; 
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; 
-}
-
-// Ruta de registro de operarios con DNI y Nombre
+// ==========================================
+// RUTA: REGISTRAR NUEVO USUARIO / OPERARIO
+// ==========================================
 app.post('/api/registro', async (req, res) => {
-    const { dni, nombre, password } = req.body;
-    if (!dni || !nombre || !password) return res.status(400).json({ error: "Faltan datos obligatorios (DNI, Nombre o Contraseña)." });
-
     try {
-        const safeDni = dni.trim().toUpperCase();
-        const userRef = db.collection('usuarios').doc(safeDni);
-        const userSnap = await userRef.get();
+        let { dni, nombre, password } = req.body;
+        if (!dni || !nombre || !password) {
+            return res.status(400).json({ error: "Todos los campos son obligatorios." });
+        }
+        dni = dni.trim().toUpperCase();
 
-        if (userSnap.exists) return res.status(400).json({ error: "Este DNI ya está registrado." });
+        const userRef = db.collection('usuarios').doc(dni);
+        const doc = await userRef.get();
+        if (doc.exists) {
+            return res.status(400).json({ error: "Este DNI ya está registrado." });
+        }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        await userRef.set({ 
-            dni: safeDni, 
-            nombre: nombre.trim(), 
-            password: hashedPassword, 
-            rol: 'operario' 
-        });
-
-        res.json({ success: true, message: "Usuario registrado correctamente." });
+        await userRef.set({ nombre, password });
+        res.json({ success: true, message: "Registro completado con éxito." });
     } catch (error) {
-        res.status(500).json({ error: "Error interno al registrar: " + error.message });
+        res.status(500).json({ error: "Error en el servidor al registrar." });
     }
 });
 
-// Ruta de fichaje validando DNI, GPS y con la hora exacta de España
+// ==========================================
+// RUTA: REALIZAR FICHAJE (CON COORDENADAS GPS)
+// ==========================================
 app.post('/api/fichar', async (req, res) => {
-    const { dni, password, ubicacion, tipo, latitud, longitud } = req.body;
-
-    if (!dni || !password || !ubicacion || !tipo || latitud === undefined || longitud === undefined) {
-        return res.status(400).json({ error: "Faltan datos o coordenadas GPS." });
-    }
-
-    const centroPermitido = centros[ubicacion];
-    if (!centroPermitido) return res.status(400).json({ error: "Centro de trabajo no válido." });
-
-    const distanciaCalculadaKm = calcularDistanciaKm(latitud, longitud, centroPermitido.lat, centroPermitido.lon);
-    if (distanciaCalculadaKm > centroPermitido.radioKm) {
-        const distanciaMetros = Math.round(distanciaCalculadaKm * 1000);
-        return res.status(403).json({ error: `Fichaje rechazado. Estás a unos ${distanciaMetros} metros del centro.` });
-    }
-
     try {
-        const safeDni = dni.trim().toUpperCase();
-        const userRef = db.collection('usuarios').doc(safeDni);
-        const userSnap = await userRef.get();
+        let { dni, password, ubicacion, tipo, latitud, longitud } = req.body;
+        if (!dni || !password || !ubicacion || !tipo) {
+            return res.status(400).json({ error: "Faltan datos obligatorios." });
+        }
+        dni = dni.trim().toUpperCase();
 
-        if (!userSnap.exists) return res.status(401).json({ error: "DNI no encontrado o incorrecto." });
+        // Validar usuario y contraseña
+        const userDoc = await db.collection('usuarios').doc(dni).get();
+        if (!userDoc.exists || userDoc.data().password !== password) {
+            return res.status(401).json({ error: "DNI o contraseña incorrectos." });
+        }
 
-        const usuario = userSnap.data();
-        const passwordMatch = await bcrypt.compare(password, usuario.password);
-        if (!passwordMatch) return res.status(401).json({ error: "Contraseña errónea." });
+        const nombreUsuario = userDoc.data().nombre;
 
-        // Generamos la fecha exacta adaptada a la hora de España
-        const fechaActual = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Madrid' }).replace(' ', 'T');
-
+        // Guardar fichaje incluyendo las coordenadas GPS que llegan del navegador
         await db.collection('fichajes').add({
-            dni: safeDni,
-            nombre: usuario.nombre,
+            dni,
+            nombre: nombreUsuario,
             ubicacion,
             tipo,
-            latitud,
-            longitud,
-            fecha: fechaActual
+            latitud: latitud || null,
+            longitud: longitud || null,
+            fecha: new Date().toISOString()
         });
 
-        const horaEspana = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
-        res.json({ success: true, message: `¡Fichaje de ${tipo} registrado con éxito a las ${horaEspana}!` });
+        res.json({ success: true, message: `Fichaje de ${tipo} registrado correctamente.` });
     } catch (error) {
-        res.status(500).json({ error: "Error al guardar el fichaje: " + error.message });
+        res.status(500).json({ error: "Error en el servidor al fichar." });
     }
 });
 
-// RUTA: Historial personal del operario por DNI
+// ==========================================
+// RUTA: HISTORIAL PERSONAL DEL OPERARIO
+// ==========================================
 app.post('/api/operario/historial', async (req, res) => {
-    const { dni, password } = req.body;
-    if (!dni || !password) return res.status(400).json({ error: "Introduce tu DNI y contraseña." });
-
     try {
-        const safeDni = dni.trim().toUpperCase();
-        const userRef = db.collection('usuarios').doc(safeDni);
-        const userSnap = await userRef.get();
+        let { dni, password } = req.body;
+        if (!dni || !password) {
+            return res.status(400).json({ error: "Credenciales incompletas." });
+        }
+        dni = dni.trim().toUpperCase();
 
-        if (!userSnap.exists) return res.status(401).json({ error: "Usuario no encontrado." });
+        const userDoc = await db.collection('usuarios').doc(dni).get();
+        if (!userDoc.exists || userDoc.data().password !== password) {
+            return res.status(401).json({ error: "Credenciales incorrectas." });
+        }
 
-        const passwordMatch = await bcrypt.compare(password, userSnap.data().password);
-        if (!passwordMatch) return res.status(401).json({ error: "Contraseña incorrecta." });
+        const snapshot = await db.collection('fichajes').where('dni', '==', dni).get();
+        let fichajes = [];
+        snapshot.forEach(doc => {
+            fichajes.push({ id: doc.id, ...doc.data() });
+        });
 
-        const snapshot = await db.collection('fichajes').where('dni', '==', safeDni).get();
-        const fichajes = [];
-        snapshot.forEach(doc => fichajes.push({ id: doc.id, ...doc.data() }));
-
+        // Ordenar por fecha descendiente
         fichajes.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         res.json({ success: true, fichajes });
     } catch (error) {
-        res.status(500).json({ error: "Error al obtener tu historial: " + error.message });
+        res.status(500).json({ error: "Error al obtener el historial." });
     }
 });
 
-// RUTA: Historial global para el empresario (Inspección de Trabajo)
-app.post('/api/empresario/fichajes', async (req, res) => {
-    const { password } = req.body;
-    const PASSWORD_EMPRESARIO = "AdminTaller2026*"; 
-
-    if (password !== PASSWORD_EMPRESARIO) {
-        return res.status(401).json({ error: "Contraseña de empresario incorrecta." });
-    }
-
+// ==========================================
+// RUTA: SOLICITAR CORRECCIÓN DE FICHAJE (OPERARIO)
+// ==========================================
+app.post('/api/operario/solicitar-correccion', async (req, res) => {
     try {
-        const snapshot = await db.collection('fichajes').orderBy('fecha', 'desc').get();
-        const fichajes = [];
-        snapshot.forEach(doc => fichajes.push({ id: doc.id, ...doc.data() }));
+        let { dni, password, fichajetargetId, nuevaFechaHora, motivo } = req.body;
+        if (!dni || !password || !fichajetargetId || !nuevaFechaHora || !motivo) {
+            return res.status(400).json({ error: "Todos los campos de la solicitud son obligatorios." });
+        }
+        dni = dni.trim().toUpperCase();
+
+        const userDoc = await db.collection('usuarios').doc(dni).get();
+        if (!userDoc.exists || userDoc.data().password !== password) {
+            return res.status(401).json({ error: "Credenciales incorrectas." });
+        }
+
+        // Guardar solicitud de corrección pendiente
+        await db.collection('solicitudes_correccion').add({
+            fichajeId: fichajetargetId,
+            dni,
+            nombre: userDoc.data().nombre,
+            nuevaFechaHora,
+            motivo,
+            estado: 'pendiente',
+            fechaSolicitud: new Date().toISOString()
+        });
+
+        res.json({ success: true, message: "Solicitud enviada al empresario correctamente." });
+    } catch (error) {
+        res.status(500).json({ error: "Error al registrar la solicitud de corrección." });
+    }
+});
+
+// ==========================================
+// RUTA: PANEL EMPRESARIO - VER TODOS LOS FICHAJES
+// ==========================================
+app.post('/api/empresario/fichajes', async (req, res) => {
+    try {
+        const { password } = req.body;
+        if (password !== ADMIN_PASSWORD) {
+            return res.status(401).json({ error: "Contraseña de empresario incorrecta." });
+        }
+
+        const snapshot = await db.collection('fichajes').get();
+        let fichajes = [];
+        snapshot.forEach(doc => {
+            fichajes.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Ordenar por fecha descendiente
+        fichajes.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         res.json({ success: true, fichajes });
     } catch (error) {
-        res.status(500).json({ error: "Error al recuperar los datos: " + error.message });
+        res.status(500).json({ error: "Error al cargar los fichajes." });
     }
 });
 
+// ==========================================
+// RUTA: PANEL EMPRESARIO - VER SOLICITUDES PENDIENTES
+// ==========================================
+app.post('/api/empresario/solicitudes', async (req, res) => {
+    try {
+        const { password } = req.body;
+        if (password !== ADMIN_PASSWORD) {
+            return res.status(401).json({ error: "Contraseña de empresario incorrecta." });
+        }
+
+        const snapshot = await db.collection('solicitudes_correccion').where('estado', '==', 'pendiente').get();
+        let solicitudes = [];
+        snapshot.forEach(doc => {
+            solicitudes.push({ id: doc.id, ...doc.data() });
+        });
+
+        res.json({ success: true, solicitudes });
+    } catch (error) {
+        res.status(500).json({ error: "Error al cargar las solicitudes." });
+    }
+});
+
+// ==========================================
+// RUTA: PANEL EMPRESARIO - RESOLVER (APROBAR/RECHAZAR) SOLICITUD
+// ==========================================
+app.post('/api/empresario/resolver-solicitud', async (req, res) => {
+    try {
+        const { password, solicitudId, accion } = req.body; // accion: 'aprobar' o 'rechazar'
+        if (password !== ADMIN_PASSWORD) {
+            return res.status(401).json({ error: "Contraseña de empresario incorrecta." });
+        }
+
+        const solicitudRef = db.collection('solicitudes_correccion').doc(solicitudId);
+        const solicitudDoc = await solicitudRef.get();
+
+        if (!solicitudDoc.exists) {
+            return res.status(404).json({ error: "La solicitud no existe." });
+        }
+
+        const data = solicitudDoc.data();
+
+        if (accion === 'aprobar') {
+            // Actualizar el fichaje original con la nueva fecha hora y dejar rastro de trazabilidad
+            const fichajeRef = db.collection('fichajes').doc(data.fichajeId);
+            await fichajeRef.update({
+                fecha: data.nuevaFechaHora,
+                modificadoPorEmpresario: true,
+                motivoModificacion: data.motivo,
+                fechaModificacion: new Date().toISOString()
+            });
+
+            await solicitudRef.update({ estado: 'aprobado' });
+            res.json({ success: true, message: "Corrección aprobada y aplicada con trazabilidad legal." });
+        } else if (accion === 'rechazar') {
+            await solicitudRef.update({ estado: 'rechazado' });
+            res.json({ success: true, message: "Solicitud rechazada." });
+        } else {
+            res.status(400).json({ error: "Acción no válida." });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Error al procesar la solicitud." });
+    }
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
+    console.log(`Servidor ejecutándose en el puerto ${PORT}`);
 });

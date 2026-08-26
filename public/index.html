@@ -29,7 +29,9 @@
 
         input[type="text"],
         input[type="password"],
-        select {
+        input[type="datetime-local"],
+        select,
+        textarea {
             width: 100%;
             box-sizing: border-box;
             margin-bottom: 12px;
@@ -55,7 +57,9 @@
         .btn-primary { background-color: #007bff; }
         .btn-success { background-color: #28a745; }
         .btn-info { background-color: #17a2b8; }
-        .btn-pdf { background-color: #dc3545; }
+        .btn-warning { background-color: #ffc107; color: #333; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-pdf { background-color: #6c757d; }
         .btn-secondary { background-color: #6c757d; font-size: 13px; padding: 8px; }
 
         button:active {
@@ -86,6 +90,26 @@
             background-color: #f1f1f1;
         }
 
+        /* Modal simple para correcciones */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+        }
+
         @media print {
             body {
                 background: white;
@@ -100,7 +124,7 @@
                 margin: 0;
                 padding: 0;
             }
-            button, input {
+            button, input, .modal {
                 display: none !important;
             }
             table {
@@ -155,6 +179,7 @@
                         <th>Centro</th>
                         <th>Tipo</th>
                         <th>Fecha y Hora</th>
+                        <th>Acción</th>
                     </tr>
                 </thead>
                 <tbody id="tabla-mi-historial-body"></tbody>
@@ -167,9 +192,25 @@
         <h3 style="color: #007bff;">Panel de Inspección Global (Empresario)</h3>
         <p style="font-size: 12px; color: #666;">Acceso restringido para cumplimiento legal e inspecciones.</p>
         <input type="password" id="admin-password" placeholder="Contraseña de empresario">
-        <button class="btn-primary" onclick="cargarFichajesEmpresario()">Cargar Todos los Registros</button>
+        <button class="btn-primary" onclick="cargarPanelEmpresario()">Cargar Registros y Solicitudes</button>
         <button class="btn-pdf" onclick="exportarPDF()">Imprimir / Guardar Informe PDF</button>
 
+        <h4 style="margin-top: 20px; color: #dc3545;">Solicitudes de corrección pendientes de operarios:</h4>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Operario</th>
+                        <th>Nueva Hora Solicitada</th>
+                        <th>Motivo</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-solicitudes-body"></tbody>
+            </table>
+        </div>
+
+        <h4 style="margin-top: 25px;">Todos los Registros de la Empresa:</h4>
         <div class="table-responsive">
             <table>
                 <thead>
@@ -186,10 +227,24 @@
         </div>
     </div>
 
+    <!-- Modal para solicitar corrección -->
+    <div id="modalCorreccion" class="modal">
+        <div class="modal-content">
+            <h3>Solicitar Corrección</h3>
+            <p style="font-size: 12px; color: #666;">Indica la fecha y hora correcta y el motivo del cambio.</p>
+            <input type="hidden" id="modal-fichaje-id">
+            <label style="font-size: 12px; font-weight: bold;">Nueva Fecha y Hora:</label>
+            <input type="datetime-local" id="modal-nueva-fecha">
+            <label style="font-size: 12px; font-weight: bold;">Motivo:</label>
+            <textarea id="modal-motivo" placeholder="Ej: Olvidé marcar la salida a las 18:00" rows="3"></textarea>
+            <button class="btn-success" onclick="enviarSolicitudCorreccion()">Enviar Solicitud</button>
+            <button class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         let fichajesGlobalesEmpresario = [];
 
-        // Al cargar la página, recuperamos los datos guardados si existen
         window.onload = function() {
             const savedDni = localStorage.getItem('taller_dni');
             const savedPass = localStorage.getItem('taller_pass');
@@ -263,9 +318,7 @@
                         return;
                     }
 
-                    // Guardamos los datos automáticamente tras un fichaje exitoso
                     guardarDatosLocalmente(dni, password);
-
                     msg.style.color = "green";
                     msg.innerText = data.message;
                 } catch (e) {
@@ -303,9 +356,7 @@
                     return;
                 }
 
-                // Guardamos tras registrarse con éxito
                 guardarDatosLocalmente(dni, password);
-
                 msg.style.color = "green";
                 msg.innerText = data.message;
             } catch (e) {
@@ -335,10 +386,12 @@
                 const tbody = document.getElementById('tabla-mi-historial-body');
                 tbody.innerHTML = '';
                 data.fichajes.forEach(f => {
+                    let notaModif = f.modificadoPorEmpresario ? '<br><small style="color:green;">(Corregido y Aprobado)</small>' : '';
                     tbody.innerHTML += `<tr>
                         <td>${f.ubicacion}</td>
                         <td><b>${f.tipo}</b></td>
-                        <td>${new Date(f.fecha).toLocaleString('es-ES')}</td>
+                        <td>${new Date(f.fecha).toLocaleString('es-ES')}${notaModif}</td>
+                        <td><button class="btn-warning" style="padding: 5px; font-size: 11px;" onclick="abrirModalCorreccion('${f.id}')">Corregir</button></td>
                     </tr>`;
                 });
             } catch (e) {
@@ -346,7 +399,48 @@
             }
         }
 
-        async function cargarFichajesEmpresario() {
+        function abrirModalCorreccion(fichajeId) {
+            document.getElementById('modal-fichaje-id').value = fichajeId;
+            document.getElementById('modal-nueva-fecha').value = '';
+            document.getElementById('modal-motivo').value = '';
+            document.getElementById('modalCorreccion').style.display = 'block';
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalCorreccion').style.display = 'none';
+        }
+
+        async function enviarSolicitudCorreccion() {
+            const dni = document.getElementById('op-dni').value;
+            const password = document.getElementById('op-password').value;
+            const fichajetargetId = document.getElementById('modal-fichaje-id').value;
+            const nuevaFechaHoraInput = document.getElementById('modal-nueva-fecha').value;
+            const motivo = document.getElementById('modal-motivo').value;
+
+            if (!nuevaFechaHoraInput || !motivo) {
+                alert("Introduce la nueva fecha/hora y el motivo.");
+                return;
+            }
+
+            const nuevaFechaHora = new Date(nuevaFechaHoraInput).toISOString();
+
+            try {
+                const res = await fetch('/api/operario/solicitar-correccion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dni, password, fichajetargetId, nuevaFechaHora, motivo })
+                });
+                const data = await res.json();
+                if (!res.ok) { alert(data.error); return; }
+
+                alert(data.message);
+                cerrarModal();
+            } catch (e) {
+                alert("Error al enviar la solicitud.");
+            }
+        }
+
+        async function cargarPanelEmpresario() {
             const password = document.getElementById('admin-password').value;
             if (!password) {
                 alert("Introduce la contraseña de empresario.");
@@ -354,6 +448,7 @@
             }
 
             try {
+                // Cargar Fichajes
                 const res = await fetch('/api/empresario/fichajes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -362,24 +457,69 @@
                 const data = await res.json();
                 if (!res.ok) { alert(data.error); return; }
 
-                // Guardamos la contraseña de administrador para la próxima vez en este dispositivo
                 localStorage.setItem('taller_admin_pass', password);
-
                 fichajesGlobalesEmpresario = data.fichajes;
+                
                 const tbody = document.getElementById('lista-fichajes-body');
                 tbody.innerHTML = '';
                 data.fichajes.forEach(f => {
+                    let notaModif = f.modificadoPorEmpresario ? `<br><small style="color:green;" title="Motivo: ${f.motivoModificacion}">✓ Modificado (Trazabilidad OK)</small>` : '';
                     tbody.innerHTML += `<tr>
                         <td>${f.dni}</td>
                         <td><b>${f.nombre || 'No especificado'}</b></td>
                         <td>${f.ubicacion}</td>
                         <td><b>${f.tipo}</b></td>
-                        <td>${new Date(f.fecha).toLocaleString('es-ES')}</td>
+                        <td>${new Date(f.fecha).toLocaleString('es-ES')}${notaModif}</td>
                     </tr>`;
                 });
-                alert("Registros cargados correctamente.");
+
+                // Cargar Solicitudes Pendientes
+                const resSol = await fetch('/api/empresario/solicitudes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const dataSol = await resSol.json();
+                const tbodySol = document.getElementById('lista-solicitudes-body');
+                tbodySol.innerHTML = '';
+
+                if (dataSol.solicitudes.length === 0) {
+                    tbodySol.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#666;">No hay solicitudes pendientes.</td></tr>`;
+                } else {
+                    dataSol.solicitudes.forEach(s => {
+                        tbodySol.innerHTML += `<tr>
+                            <td><b>${s.nombre}</b> (${s.dni})</td>
+                            <td>${new Date(s.nuevaFechaHora).toLocaleString('es-ES')}</td>
+                            <td>${s.motivo}</td>
+                            <td>
+                                <button class="btn-success" style="padding: 5px; font-size: 11px; margin-bottom: 4px;" onclick="resolverSolicitud('${s.id}', 'aprobar')">Aprobar</button>
+                                <button class="btn-danger" style="padding: 5px; font-size: 11px;" onclick="resolverSolicitud('${s.id}', 'rechazar')">Rechazar</button>
+                            </td>
+                        </tr>`;
+                    });
+                }
+
+                alert("Panel de empresario actualizado.");
             } catch (e) {
                 alert("Error de conexión.");
+            }
+        }
+
+        async function resolverSolicitud(solicitudId, accion) {
+            const password = document.getElementById('admin-password').value;
+            try {
+                const res = await fetch('/api/empresario/resolver-solicitud', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, solicitudId, accion })
+                });
+                const data = await res.json();
+                if (!res.ok) { alert(data.error); return; }
+
+                alert(data.message);
+                cargarPanelEmpresario(); // Recargar paneles
+            } catch (e) {
+                alert("Error al resolver la solicitud.");
             }
         }
 
