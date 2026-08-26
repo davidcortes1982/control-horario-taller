@@ -49,20 +49,25 @@ function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
     return R * c; 
 }
 
-// Ruta de registro de operarios
+// Ruta de registro de operarios con DNI y Nombre
 app.post('/api/registro', async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: "Faltan datos obligatorios." });
+    const { dni, nombre, password } = req.body;
+    if (!dni || !nombre || !password) return res.status(400).json({ error: "Faltan datos obligatorios (DNI, Nombre o Contraseña)." });
 
     try {
-        const safeEmail = email.trim().toLowerCase();
-        const userRef = db.collection('usuarios').doc(safeEmail);
+        const safeDni = dni.trim().toUpperCase();
+        const userRef = db.collection('usuarios').doc(safeDni);
         const userSnap = await userRef.get();
 
-        if (userSnap.exists) return res.status(400).json({ error: "Este correo ya está registrado." });
+        if (userSnap.exists) return res.status(400).json({ error: "Este DNI ya está registrado." });
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        await userRef.set({ email: safeEmail, password: hashedPassword, rol: 'operario' });
+        await userRef.set({ 
+            dni: safeDni, 
+            nombre: nombre.trim(), 
+            password: hashedPassword, 
+            rol: 'operario' 
+        });
 
         res.json({ success: true, message: "Usuario registrado correctamente." });
     } catch (error) {
@@ -70,11 +75,11 @@ app.post('/api/registro', async (req, res) => {
     }
 });
 
-// Ruta de fichaje con validación de credenciales y GPS
+// Ruta de fichaje validando DNI y GPS
 app.post('/api/fichar', async (req, res) => {
-    const { email, password, ubicacion, tipo, latitud, longitud } = req.body;
+    const { dni, password, ubicacion, tipo, latitud, longitud } = req.body;
 
-    if (!email || !password || !ubicacion || !tipo || latitud === undefined || longitud === undefined) {
+    if (!dni || !password || !ubicacion || !tipo || latitud === undefined || longitud === undefined) {
         return res.status(400).json({ error: "Faltan datos o coordenadas GPS." });
     }
 
@@ -88,11 +93,11 @@ app.post('/api/fichar', async (req, res) => {
     }
 
     try {
-        const safeEmail = email.trim().toLowerCase();
-        const userRef = db.collection('usuarios').doc(safeEmail);
+        const safeDni = dni.trim().toUpperCase();
+        const userRef = db.collection('usuarios').doc(safeDni);
         const userSnap = await userRef.get();
 
-        if (!userSnap.exists) return res.status(401).json({ error: "Credenciales incorrectas." });
+        if (!userSnap.exists) return res.status(401).json({ error: "DNI no encontrado o incorrecto." });
 
         const usuario = userSnap.data();
         const passwordMatch = await bcrypt.compare(password, usuario.password);
@@ -100,7 +105,8 @@ app.post('/api/fichar', async (req, res) => {
 
         const fechaActual = new Date().toISOString();
         await db.collection('fichajes').add({
-            email: safeEmail,
+            dni: safeDni,
+            nombre: usuario.nombre,
             ubicacion,
             tipo,
             latitud,
@@ -115,14 +121,14 @@ app.post('/api/fichar', async (req, res) => {
     }
 });
 
-// RUTA: Historial personal del operario (Sin requerir índice en Firestore)
+// RUTA: Historial personal del operario por DNI
 app.post('/api/operario/historial', async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: "Introduce tu correo y contraseña." });
+    const { dni, password } = req.body;
+    if (!dni || !password) return res.status(400).json({ error: "Introduce tu DNI y contraseña." });
 
     try {
-        const safeEmail = email.trim().toLowerCase();
-        const userRef = db.collection('usuarios').doc(safeEmail);
+        const safeDni = dni.trim().toUpperCase();
+        const userRef = db.collection('usuarios').doc(safeDni);
         const userSnap = await userRef.get();
 
         if (!userSnap.exists) return res.status(401).json({ error: "Usuario no encontrado." });
@@ -130,12 +136,10 @@ app.post('/api/operario/historial', async (req, res) => {
         const passwordMatch = await bcrypt.compare(password, userSnap.data().password);
         if (!passwordMatch) return res.status(401).json({ error: "Contraseña incorrecta." });
 
-        // Consultamos solo por email (no requiere índice compuesto en Firebase)
-        const snapshot = await db.collection('fichajes').where('email', '==', safeEmail).get();
+        const snapshot = await db.collection('fichajes').where('dni', '==', safeDni).get();
         const fichajes = [];
         snapshot.forEach(doc => fichajes.push({ id: doc.id, ...doc.data() }));
 
-        // Ordenamos los fichajes por fecha del más nuevo al más antiguo aquí mismo
         fichajes.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         res.json({ success: true, fichajes });

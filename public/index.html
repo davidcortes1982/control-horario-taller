@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control Horario - Taller</title>
     <style>
-        /* Estilos generales responsivos para móviles */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -20,7 +19,6 @@
             font-size: 1.2rem;
         }
 
-        /* Contenedores de secciones */
         .seccion-card {
             background: #ffffff;
             padding: 15px;
@@ -29,16 +27,14 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
-        /* Inputs y botones grandes y cómodos para móvil */
         input[type="text"],
-        input[type="email"],
         input[type="password"],
         select {
             width: 100%;
             box-sizing: border-box;
             margin-bottom: 12px;
             padding: 12px;
-            font-size: 16px; /* Evita zoom automático en iPhone */
+            font-size: 16px;
             border-radius: 6px;
             border: 1px solid #ccc;
         }
@@ -64,7 +60,6 @@
             opacity: 0.8;
         }
 
-        /* Contenedor de tablas con scroll horizontal interno para evitar desbordar la pantalla */
         .table-responsive {
             width: 100%;
             overflow-x: auto;
@@ -74,7 +69,7 @@
 
         table {
             width: 100%;
-            min-width: 450px;
+            min-width: 500px;
             border-collapse: collapse;
             font-size: 13px;
         }
@@ -94,10 +89,11 @@
 
     <h2>Control Horario y Fichajes</h2>
 
-    <!-- Sección de Registro o Fichaje (Suposición de tu vista principal) -->
+    <!-- Sección de Registro o Fichaje -->
     <div class="seccion-card">
         <h3>Realizar Fichaje / Registro</h3>
-        <input type="email" id="email" placeholder="Correo electrónico">
+        <input type="text" id="dni" placeholder="DNI / NIE (Ej: 12345678A)">
+        <input type="text" id="nombre" placeholder="Nombre y Apellidos (Solo para registrarse)">
         <input type="password" id="password" placeholder="Contraseña">
         
         <select id="ubicacion">
@@ -119,8 +115,8 @@
     <!-- Sección de Historial Personal (Operario) -->
     <div class="seccion-card">
         <h3>Mis Fichajes (Operario)</h3>
-        <p style="font-size: 12px; color: #666;">Introduce tus credenciales para ver tu propio historial.</p>
-        <input type="email" id="op-email" placeholder="Tu correo">
+        <p style="font-size: 12px; color: #666;">Introduce tu DNI y contraseña para ver tu historial.</p>
+        <input type="text" id="op-dni" placeholder="Tu DNI">
         <input type="password" id="op-password" placeholder="Tu contraseña">
         <button class="btn-info" onclick="cargarMiHistorial()">Ver Mi Historial</button>
         
@@ -150,7 +146,8 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Correo</th>
+                        <th>DNI</th>
+                        <th>Nombre y Apellidos</th>
                         <th>Centro</th>
                         <th>Tipo</th>
                         <th>Fecha y Hora</th>
@@ -165,16 +162,15 @@
     <script>
         let fichajesGlobalesEmpresario = [];
 
-        // Función de fichaje con geolocalización
         function realizarFichaje() {
-            const email = document.getElementById('email').value;
+            const dni = document.getElementById('dni').value;
             const password = document.getElementById('password').value;
             const ubicacion = document.getElementById('ubicacion').value;
             const tipo = document.getElementById('tipo').value;
             const msg = document.getElementById('mensaje-estado');
 
-            if (!email || !password) {
-                alert("Introduce correo y contraseña.");
+            if (!dni || !password) {
+                alert("Introduce DNI y contraseña.");
                 return;
             }
 
@@ -194,7 +190,7 @@
                     const res = await fetch('/api/fichar', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, password, ubicacion, tipo, latitud, longitud })
+                        body: JSON.stringify({ dni, password, ubicacion, tipo, latitud, longitud })
                     });
                     const data = await res.json();
                     
@@ -216,14 +212,14 @@
             }, { enableHighAccuracy: true });
         }
 
-        // Función de registro de usuario nuevo
         async function registrarUsuario() {
-            const email = document.getElementById('email').value;
+            const dni = document.getElementById('dni').value;
+            const nombre = document.getElementById('nombre').value;
             const password = document.getElementById('password').value;
             const msg = document.getElementById('mensaje-estado');
 
-            if (!email || !password) {
-                alert("Introduce correo y contraseña para registrarte.");
+            if (!dni || !nombre || !password) {
+                alert("Introduce DNI, Nombre completo y contraseña para registrarte.");
                 return;
             }
 
@@ -231,7 +227,7 @@
                 const res = await fetch('/api/registro', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ dni, nombre, password })
                 });
                 const data = await res.json();
                 
@@ -241,21 +237,20 @@
                     return;
                 }
 
-                msg.style.color = "green";
-                msg.innerText = data.message;
+                    msg.style.color = "green";
+                    msg.innerText = data.message;
             } catch (e) {
                 msg.style.color = "red";
                 msg.innerText = "Error de conexión al registrar.";
             }
         }
 
-        // Consultar historial personal
         async function cargarMiHistorial() {
-            const email = document.getElementById('op-email').value;
+            const dni = document.getElementById('op-dni').value;
             const password = document.getElementById('op-password').value;
 
-            if (!email || !password) {
-                alert("Introduce tu correo y contraseña.");
+            if (!dni || !password) {
+                alert("Introduce tu DNI y contraseña.");
                 return;
             }
 
@@ -263,7 +258,7 @@
                 const res = await fetch('/api/operario/historial', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ dni, password })
                 });
                 const data = await res.json();
                 if (!res.ok) { alert(data.error); return; }
@@ -282,7 +277,6 @@
             }
         }
 
-        // Consultar historial global (Empresario)
         async function cargarFichajesEmpresario() {
             const password = document.getElementById('admin-password').value;
             try {
@@ -299,7 +293,8 @@
                 tbody.innerHTML = '';
                 data.fichajes.forEach(f => {
                     tbody.innerHTML += `<tr>
-                        <td>${f.email}</td>
+                        <td>${f.dni}</td>
+                        <td><b>${f.nombre || 'No especificado'}</b></td>
                         <td>${f.ubicacion}</td>
                         <td><b>${f.tipo}</b></td>
                         <td>${new Date(f.fecha).toLocaleString('es-ES')}</td>
@@ -312,15 +307,15 @@
             }
         }
 
-        // Exportar a CSV para Inspección
         function exportarCSV() {
             if (fichajesGlobalesEmpresario.length === 0) {
                 alert("Primero carga los registros con la contraseña de empresario.");
                 return;
             }
-            let csvContent = "data:text/csv;charset=utf-8,Correo,Centro,Tipo,FechaHora,Latitud,Longitud\r\n";
+            let csvContent = "data:text/csv;charset=utf-8,DNI,Nombre,Centro,Tipo,FechaHora,Latitud,Longitud\r\n";
             fichajesGlobalesEmpresario.forEach(f => {
-                csvContent += [f.email, f.ubicacion, f.tipo, f.fecha, f.latitud, f.longitud].join(",") + "\r\n";
+                let nombreLimpio = f.nombre ? f.nombre.replace(/,/g, "") : "";
+                csvContent += [f.dni, nombreLimpio, f.ubicacion, f.tipo, f.fecha, f.latitud, f.longitud].join(",") + "\r\n";
             });
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
