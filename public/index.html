@@ -91,6 +91,7 @@
             background-color: #f1f1f1;
         }
 
+        /* Oculto por defecto en la web normal, se muestra al imprimir */
         .print-header {
             display: none;
         }
@@ -121,22 +122,28 @@
                 padding: 0;
             }
             .seccion-card:not(#panel-empresario) {
-                display: none;
+                display: none !important;
             }
             #panel-empresario {
                 border: none !important;
                 box-shadow: none !important;
-                margin: 0;
-                padding: 0;
+                margin: 0 !important;
+                padding: 0 !important;
             }
             button, input, select, .modal, .no-print {
                 display: none !important;
             }
+            /* FUERZA QUE LA CABECERA DEL INFORME APAREZCA EN EL PDF */
             .print-header {
                 display: block !important;
-                margin-bottom: 20px;
-                border-bottom: 2px solid #333;
-                padding-bottom: 10px;
+                visibility: visible !important;
+                margin-bottom: 20px !important;
+                border-bottom: 2px solid #333 !important;
+                padding-bottom: 10px !important;
+            }
+            .print-header * {
+                display: block !important;
+                visibility: visible !important;
             }
             table {
                 font-size: 11px;
@@ -200,11 +207,13 @@
 
     <!-- Sección de Panel de Inspección (Empresario) -->
     <div class="seccion-card" id="panel-empresario" style="border: 2px dashed #007bff;">
+        
+        <!-- CABECERA EXCLUSIVA PARA IMPRESIÓN PDF -->
         <div class="print-header">
-            <h2 style="margin: 0 0 5px 0;">INFORME OFICIAL DE CONTROL HORARIO</h2>
-            <p id="print-info-mes" style="margin: 0; font-size: 14px; font-weight: bold;"></p>
-            <p id="print-info-operario" style="margin: 3px 0 0 0; font-size: 13px; font-weight: bold; color: #333;"></p>
-            <p style="margin: 5px 0 0 0; font-size: 11px; color: #555;">Documento generado conforme al RDL 8/2019 de registro de jornada.</p>
+            <h2 style="margin: 0 0 5px 0; color: #000;">INFORME OFICIAL DE CONTROL HORARIO</h2>
+            <p id="print-info-mes" style="margin: 0 0 3px 0; font-size: 14px; font-weight: bold;"></p>
+            <p id="print-info-operario" style="margin: 0 0 5px 0; font-size: 13px; font-weight: bold;"></p>
+            <p style="margin: 0; font-size: 11px; color: #555;">Documento generado conforme al RDL 8/2019 de registro de jornada.</p>
         </div>
 
         <h3 style="color: #007bff;" class="no-print">Panel de Inspección Global (Empresario)</h3>
@@ -296,7 +305,6 @@
                 document.getElementById('admin-password').value = savedAdminPass;
             }
 
-            // Inicializar el selector de mes con el mes actual en formato YYYY-MM
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -488,7 +496,6 @@
             }
 
             try {
-                // Cargar Fichajes
                 const res = await fetch('/api/empresario/fichajes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -500,10 +507,8 @@
                 localStorage.setItem('taller_admin_pass', password);
                 fichajesGlobalesEmpresario = data.fichajes;
                 
-                // Poblar el selector de operarios dinámicamente
                 poblarSelectOperarios(data.fichajes);
 
-                // Cargar Solicitudes Pendientes
                 const resSol = await fetch('/api/empresario/solicitudes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -521,9 +526,8 @@
 
         function poblarSelectOperarios(fichajes) {
             const selectOperario = document.getElementById('filtro-operario');
-            const valorActual = selectOperario.value; // Mantener selección si ya estaba elegida
+            const valorActual = selectOperario.value;
             
-            // Extraer operarios únicos basados en su DNI
             const operariosMap = new Map();
             fichajes.forEach(f => {
                 if (f.dni) {
@@ -540,13 +544,12 @@
         }
 
         function renderizarTablasEmpresario() {
-            const filtroMes = document.getElementById('filtro-mes').value; // Formato "YYYY-MM"
+            const filtroMes = document.getElementById('filtro-mes').value;
             const filtroDniOperario = document.getElementById('filtro-operario').value;
             
-            // Textos para la cabecera de impresión oficial
             const nombreMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             
-            let textoMes = "Todos los períodos";
+            let textoMes = "Período: Todos los meses";
             if (filtroMes) {
                 const [anio, mes] = filtroMes.split('-');
                 textoMes = `Período: ${nombreMeses[parseInt(mes) - 1]} de ${anio}`;
@@ -561,7 +564,6 @@
             }
             document.getElementById('print-info-operario').innerText = textoOperario;
 
-            // Filtrar fichajes combinados (Mes + Operario)
             const fichajesFiltrados = fichajesGlobalesEmpresario.filter(f => {
                 let coincideMes = true;
                 let coincideOperario = true;
@@ -598,7 +600,6 @@
                 });
             }
 
-            // Renderizar solicitudes pendientes (estas no cambian con el filtro de mes/operario para que el admin las vea siempre)
             const tbodySol = document.getElementById('lista-solicitudes-body');
             tbodySol.innerHTML = '';
 
@@ -631,7 +632,7 @@
                 if (!res.ok) { alert(data.error); return; }
 
                 alert(data.message);
-                cargarPanelEmpresario(); // Recargar paneles
+                cargarPanelEmpresario();
             } catch (e) {
                 alert("Error al resolver la solicitud.");
             }
