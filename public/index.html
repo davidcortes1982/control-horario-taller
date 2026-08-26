@@ -69,7 +69,7 @@
 
         table {
             width: 100%;
-            min-width: 500px;
+            min-width: 450px;
             border-collapse: collapse;
             font-size: 13px;
         }
@@ -134,7 +134,7 @@
         </div>
     </div>
 
-    <!-- Sección de Panel de Inspección (Empresario) -->
+    <!-- Sección de Panel de Inspección (Empresario - Sin Coordenadas) -->
     <div class="seccion-card" style="border: 2px dashed #007bff;">
         <h3 style="color: #007bff;">Panel de Inspección Global (Empresario)</h3>
         <p style="font-size: 12px; color: #666;">Acceso restringido para cumplimiento legal e inspecciones.</p>
@@ -151,7 +151,6 @@
                         <th>Centro</th>
                         <th>Tipo</th>
                         <th>Fecha y Hora</th>
-                        <th>GPS</th>
                     </tr>
                 </thead>
                 <tbody id="lista-fichajes-body"></tbody>
@@ -237,8 +236,8 @@
                     return;
                 }
 
-                    msg.style.color = "green";
-                    msg.innerText = data.message;
+                msg.style.color = "green";
+                msg.innerText = data.message;
             } catch (e) {
                 msg.style.color = "red";
                 msg.innerText = "Error de conexión al registrar.";
@@ -298,7 +297,6 @@
                         <td>${f.ubicacion}</td>
                         <td><b>${f.tipo}</b></td>
                         <td>${new Date(f.fecha).toLocaleString('es-ES')}</td>
-                        <td style="font-size: 11px;">${f.latitud}, ${f.longitud}</td>
                     </tr>`;
                 });
                 alert("Registros cargados correctamente.");
@@ -312,10 +310,11 @@
                 alert("Primero carga los registros con la contraseña de empresario.");
                 return;
             }
-            let csvContent = "data:text/csv;charset=utf-8,DNI,Nombre,Centro,Tipo,FechaHora,Latitud,Longitud\r\n";
+            // Cabecera CSV sin latitud ni longitud
+            let csvContent = "data:text/csv;charset=utf-8,DNI,Nombre,Centro,Tipo,FechaHora\r\n";
             fichajesGlobalesEmpresario.forEach(f => {
                 let nombreLimpio = f.nombre ? f.nombre.replace(/,/g, "") : "";
-                csvContent += [f.dni, nombreLimpio, f.ubicacion, f.tipo, f.fecha, f.latitud, f.longitud].join(",") + "\r\n";
+                csvContent += [f.dni, nombreLimpio, f.ubicacion, f.tipo, f.fecha].join(",") + "\r\n";
             });
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
