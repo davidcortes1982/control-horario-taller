@@ -30,6 +30,7 @@
         input[type="text"],
         input[type="password"],
         input[type="datetime-local"],
+        input[type="month"],
         select,
         textarea {
             width: 100%;
@@ -90,6 +91,10 @@
             background-color: #f1f1f1;
         }
 
+        .print-header {
+            display: none;
+        }
+
         /* Modal simple para correcciones */
         .modal {
             display: none;
@@ -124,8 +129,14 @@
                 margin: 0;
                 padding: 0;
             }
-            button, input, .modal {
+            button, input, select, .modal, .no-print {
                 display: none !important;
+            }
+            .print-header {
+                display: block !important;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #333;
+                padding-bottom: 10px;
             }
             table {
                 font-size: 11px;
@@ -141,7 +152,7 @@
     <h2>Control Horario y Fichajes</h2>
 
     <!-- Sección de Registro o Fichaje -->
-    <div class="seccion-card">
+    <div class="seccion-card no-print">
         <h3>Realizar Fichaje / Registro</h3>
         <input type="text" id="dni" placeholder="DNI / NIE (Ej: 12345678A)">
         <input type="text" id="nombre" placeholder="Nombre y Apellidos (Solo para registrarse)">
@@ -165,7 +176,7 @@
     </div>
 
     <!-- Sección de Historial Personal (Operario) -->
-    <div class="seccion-card">
+    <div class="seccion-card no-print">
         <h3>Mis Fichajes (Operario)</h3>
         <p style="font-size: 12px; color: #666;">Tus datos se autocompletan solos.</p>
         <input type="text" id="op-dni" placeholder="Tu DNI" readonly style="background-color: #e9ecef;">
@@ -189,14 +200,36 @@
 
     <!-- Sección de Panel de Inspección (Empresario) -->
     <div class="seccion-card" id="panel-empresario" style="border: 2px dashed #007bff;">
-        <h3 style="color: #007bff;">Panel de Inspección Global (Empresario)</h3>
-        <p style="font-size: 12px; color: #666;">Acceso restringido para cumplimiento legal e inspecciones.</p>
-        <input type="password" id="admin-password" placeholder="Contraseña de empresario">
-        <button class="btn-primary" onclick="cargarPanelEmpresario()">Cargar Registros y Solicitudes</button>
-        <button class="btn-pdf" onclick="exportarPDF()">Imprimir / Guardar Informe PDF</button>
+        <div class="print-header">
+            <h2 style="margin: 0 0 5px 0;">INFORME OFICIAL DE CONTROL HORARIO</h2>
+            <p id="print-info-mes" style="margin: 0; font-size: 14px; font-weight: bold;"></p>
+            <p id="print-info-operario" style="margin: 3px 0 0 0; font-size: 13px; font-weight: bold; color: #333;"></p>
+            <p style="margin: 5px 0 0 0; font-size: 11px; color: #555;">Documento generado conforme al RDL 8/2019 de registro de jornada.</p>
+        </div>
 
-        <h4 style="margin-top: 20px; color: #dc3545;">Solicitudes de corrección pendientes de operarios:</h4>
-        <div class="table-responsive">
+        <h3 style="color: #007bff;" class="no-print">Panel de Inspección Global (Empresario)</h3>
+        <p style="font-size: 12px; color: #666;" class="no-print">Acceso restringido para cumplimiento legal e inspecciones.</p>
+        
+        <input type="password" id="admin-password" placeholder="Contraseña de empresario" class="no-print">
+        
+        <div class="no-print" style="margin-bottom: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 5px;">Filtrar por Mes:</label>
+                <input type="month" id="filtro-mes" onchange="renderizarTablasEmpresario()">
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <label style="font-size: 13px; font-weight: bold; display: block; margin-bottom: 5px;">Filtrar por Operario:</label>
+                <select id="filtro-operario" onchange="renderizarTablasEmpresario()">
+                    <option value="">-- Todos los operarios --</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-primary no-print" onclick="cargarPanelEmpresario()">Cargar Registros y Solicitudes</button>
+        <button class="btn-pdf no-print" onclick="exportarPDF()">Imprimir / Guardar Informe PDF Oficial</button>
+
+        <h4 style="margin-top: 20px; color: #dc3545;" class="no-print">Solicitudes de corrección pendientes de operarios:</h4>
+        <div class="table-responsive no-print">
             <table>
                 <thead>
                     <tr>
@@ -210,7 +243,7 @@
             </table>
         </div>
 
-        <h4 style="margin-top: 25px;">Todos los Registros de la Empresa:</h4>
+        <h4 style="margin-top: 25px;">Registros de la Empresa (Filtrados):</h4>
         <div class="table-responsive">
             <table>
                 <thead>
@@ -219,7 +252,7 @@
                         <th>Nombre y Apellidos</th>
                         <th>Centro</th>
                         <th>Tipo</th>
-                        <th>Fecha y Hora</th>
+                        <th>Fecha y Hora / Observaciones de Trazabilidad</th>
                     </tr>
                 </thead>
                 <tbody id="lista-fichajes-body"></tbody>
@@ -244,6 +277,7 @@
 
     <script>
         let fichajesGlobalesEmpresario = [];
+        let solicitudesGlobalesEmpresario = [];
 
         window.onload = function() {
             const savedDni = localStorage.getItem('taller_dni');
@@ -261,6 +295,12 @@
             if (savedAdminPass) {
                 document.getElementById('admin-password').value = savedAdminPass;
             }
+
+            // Inicializar el selector de mes con el mes actual en formato YYYY-MM
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('filtro-mes').value = `${year}-${month}`;
         };
 
         function guardarDatosLocalmente(dni, password) {
@@ -460,18 +500,8 @@
                 localStorage.setItem('taller_admin_pass', password);
                 fichajesGlobalesEmpresario = data.fichajes;
                 
-                const tbody = document.getElementById('lista-fichajes-body');
-                tbody.innerHTML = '';
-                data.fichajes.forEach(f => {
-                    let notaModif = f.modificadoPorEmpresario ? `<br><small style="color:green;" title="Motivo: ${f.motivoModificacion}">✓ Modificado (Trazabilidad OK)</small>` : '';
-                    tbody.innerHTML += `<tr>
-                        <td>${f.dni}</td>
-                        <td><b>${f.nombre || 'No especificado'}</b></td>
-                        <td>${f.ubicacion}</td>
-                        <td><b>${f.tipo}</b></td>
-                        <td>${new Date(f.fecha).toLocaleString('es-ES')}${notaModif}</td>
-                    </tr>`;
-                });
+                // Poblar el selector de operarios dinámicamente
+                poblarSelectOperarios(data.fichajes);
 
                 // Cargar Solicitudes Pendientes
                 const resSol = await fetch('/api/empresario/solicitudes', {
@@ -480,28 +510,112 @@
                     body: JSON.stringify({ password })
                 });
                 const dataSol = await resSol.json();
-                const tbodySol = document.getElementById('lista-solicitudes-body');
-                tbodySol.innerHTML = '';
+                solicitudesGlobalesEmpresario = dataSol.solicitudes;
 
-                if (dataSol.solicitudes.length === 0) {
-                    tbodySol.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#666;">No hay solicitudes pendientes.</td></tr>`;
-                } else {
-                    dataSol.solicitudes.forEach(s => {
-                        tbodySol.innerHTML += `<tr>
-                            <td><b>${s.nombre}</b> (${s.dni})</td>
-                            <td>${new Date(s.nuevaFechaHora).toLocaleString('es-ES')}</td>
-                            <td>${s.motivo}</td>
-                            <td>
-                                <button class="btn-success" style="padding: 5px; font-size: 11px; margin-bottom: 4px;" onclick="resolverSolicitud('${s.id}', 'aprobar')">Aprobar</button>
-                                <button class="btn-danger" style="padding: 5px; font-size: 11px;" onclick="resolverSolicitud('${s.id}', 'rechazar')">Rechazar</button>
-                            </td>
-                        </tr>`;
-                    });
-                }
-
+                renderizarTablasEmpresario();
                 alert("Panel de empresario actualizado.");
             } catch (e) {
                 alert("Error de conexión.");
+            }
+        }
+
+        function poblarSelectOperarios(fichajes) {
+            const selectOperario = document.getElementById('filtro-operario');
+            const valorActual = selectOperario.value; // Mantener selección si ya estaba elegida
+            
+            // Extraer operarios únicos basados en su DNI
+            const operariosMap = new Map();
+            fichajes.forEach(f => {
+                if (f.dni) {
+                    operariosMap.set(f.dni, f.nombre || f.dni);
+                }
+            });
+
+            selectOperario.innerHTML = `<option value="">-- Todos los operarios --</option>`;
+            operariosMap.forEach((nombre, dni) => {
+                selectOperario.innerHTML += `<option value="${dni}">${nombre} (${dni})</option>`;
+            });
+
+            selectOperario.value = valorActual;
+        }
+
+        function renderizarTablasEmpresario() {
+            const filtroMes = document.getElementById('filtro-mes').value; // Formato "YYYY-MM"
+            const filtroDniOperario = document.getElementById('filtro-operario').value;
+            
+            // Textos para la cabecera de impresión oficial
+            const nombreMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            
+            let textoMes = "Todos los períodos";
+            if (filtroMes) {
+                const [anio, mes] = filtroMes.split('-');
+                textoMes = `Período: ${nombreMeses[parseInt(mes) - 1]} de ${anio}`;
+            }
+            document.getElementById('print-info-mes').innerText = textoMes;
+
+            const selectOperarioElement = document.getElementById('filtro-operario');
+            let textoOperario = "Trabajador: Todos los operarios";
+            if (filtroDniOperario) {
+                const nombreSeleccionado = selectOperarioElement.options[selectOperarioElement.selectedIndex].text;
+                textoOperario = `Trabajador: ${nombreSeleccionado}`;
+            }
+            document.getElementById('print-info-operario').innerText = textoOperario;
+
+            // Filtrar fichajes combinados (Mes + Operario)
+            const fichajesFiltrados = fichajesGlobalesEmpresario.filter(f => {
+                let coincideMes = true;
+                let coincideOperario = true;
+
+                if (filtroMes) {
+                    coincideMes = f.fecha && f.fecha.startsWith(filtroMes);
+                }
+                if (filtroDniOperario) {
+                    coincideOperario = f.dni === filtroDniOperario;
+                }
+
+                return coincideMes && coincideOperario;
+            });
+
+            const tbody = document.getElementById('lista-fichajes-body');
+            tbody.innerHTML = '';
+            
+            if (fichajesFiltrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#666;">No hay registros para los filtros seleccionados.</td></tr>`;
+            } else {
+                fichajesFiltrados.forEach(f => {
+                    let notaModif = '';
+                    if (f.modificadoPorEmpresario) {
+                        notaModif = `<br><span style="color:#d9534f; font-weight:bold;">[CORRECCIÓN APROBADA]</span><br><small style="color:#555;">Motivo: ${f.motivoModificacion || 'No especificado'}</small>`;
+                    }
+                    
+                    tbody.innerHTML += `<tr>
+                        <td>${f.dni}</td>
+                        <td><b>${f.nombre || 'No especificado'}</b></td>
+                        <td>${f.ubicacion}</td>
+                        <td><b>${f.tipo}</b></td>
+                        <td>${new Date(f.fecha).toLocaleString('es-ES')}${notaModif}</td>
+                    </tr>`;
+                });
+            }
+
+            // Renderizar solicitudes pendientes (estas no cambian con el filtro de mes/operario para que el admin las vea siempre)
+            const tbodySol = document.getElementById('lista-solicitudes-body');
+            tbodySol.innerHTML = '';
+
+            if (solicitudesGlobalesEmpresario.length === 0) {
+                tbodySol.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#666;">No hay solicitudes pendientes.</td></tr>`;
+            } else {
+                solicitudesGlobalesEmpresario.forEach(s => {
+                    tbodySol.innerHTML += `<tr>
+                        <td><b>${s.nombre}</b> (${s.dni})</td>
+                        <td>${new Date(s.nuevaFechaHora).toLocaleString('es-ES')}</td>
+                        <td>${s.motivo}</td>
+                        <td>
+                            <button class="btn-success" style="padding: 5px; font-size: 11px; margin-bottom: 4px;" onclick="resolverSolicitud('${s.id}', 'aprobar')">Aprobar</button>
+                            <button class="btn-danger" style="padding: 5px; font-size: 11px;" onclick="resolverSolicitud('${s.id}', 'rechazar')">Rechazar</button>
+                        </td>
+                    </tr>`;
+                });
             }
         }
 
