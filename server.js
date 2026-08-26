@@ -4,7 +4,7 @@ const path = require('path');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-// Cargar credenciales de Firebase de forma segura para Render y desarrollo local
+// Cargar credenciales de Firebase de forma totalmente segura para Render
 let serviceAccount;
 if (process.env.FIREBASE_CREDENTIALS) {
     try {
@@ -13,7 +13,12 @@ if (process.env.FIREBASE_CREDENTIALS) {
         console.error("Error al parsear FIREBASE_CREDENTIALS:", e);
     }
 } else {
-    serviceAccount = require('./serviceAccountKey.json');
+    // Si estás en desarrollo local y tienes el archivo, lo lee. Si no, avisa.
+    try {
+        serviceAccount = require('./serviceAccountKey.json');
+    } catch (e) {
+        console.error("No se encontró el archivo serviceAccountKey.json ni la variable FIREBASE_CREDENTIALS.");
+    }
 }
 
 initializeApp({
