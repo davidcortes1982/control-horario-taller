@@ -240,7 +240,7 @@
                 <thead>
                     <tr>
                         <th>Operario</th>
-                        <th>Nueva Hora Solicitada</th>
+                        <th>Nuevo Tipo y Hora Solicitada</th>
                         <th>Motivo</th>
                         <th>Acción</th>
                     </tr>
@@ -270,12 +270,21 @@
     <div id="modalCorreccion" class="modal">
         <div class="modal-content">
             <h3>Solicitar Corrección</h3>
-            <p style="font-size: 12px; color: #666;">Indica la fecha y hora correcta y el motivo del cambio.</p>
+            <p style="font-size: 12px; color: #666;">Indica si era entrada o salida, la fecha y hora correcta, y el motivo.</p>
             <input type="hidden" id="modal-fichaje-id">
+            
+            <label style="font-size: 12px; font-weight: bold;">Tipo de fichaje correcto:</label>
+            <select id="modal-nuevo-tipo">
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
+            </select>
+
             <label style="font-size: 12px; font-weight: bold;">Nueva Fecha y Hora:</label>
             <input type="datetime-local" id="modal-nueva-fecha">
+            
             <label style="font-size: 12px; font-weight: bold;">Motivo:</label>
-            <textarea id="modal-motivo" placeholder="Ej: Olvidé marcar la salida a las 18:00" rows="3"></textarea>
+            <textarea id="modal-motivo" placeholder="Ej: Me equivoqué y marqué salida en lugar de entrada" rows="3"></textarea>
+            
             <button class="btn-success" onclick="enviarSolicitudCorreccion()">Enviar Solicitud</button>
             <button class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
         </div>
@@ -286,28 +295,17 @@
         let solicitudesGlobalesEmpresario = [];
 
         window.onload = function() {
-            // Recuperar datos guardados para el fichaje y para el historial de forma independiente
             const savedDni = localStorage.getItem('taller_dni');
             const savedPass = localStorage.getItem('taller_pass');
             const savedOpDni = localStorage.getItem('taller_op_dni');
             const savedOpPass = localStorage.getItem('taller_op_pass');
             const savedAdminPass = localStorage.getItem('taller_admin_pass');
 
-            if (savedDni) {
-                document.getElementById('dni').value = savedDni;
-            }
-            if (savedPass) {
-                document.getElementById('password').value = savedPass;
-            }
-            if (savedOpDni) {
-                document.getElementById('op-dni').value = savedOpDni;
-            }
-            if (savedOpPass) {
-                document.getElementById('op-password').value = savedOpPass;
-            }
-            if (savedAdminPass) {
-                document.getElementById('admin-password').value = savedAdminPass;
-            }
+            if (savedDni) document.getElementById('dni').value = savedDni;
+            if (savedPass) document.getElementById('password').value = savedPass;
+            if (savedOpDni) document.getElementById('op-dni').value = savedOpDni;
+            if (savedOpPass) document.getElementById('op-password').value = savedOpPass;
+            if (savedAdminPass) document.getElementById('admin-password').value = savedAdminPass;
 
             const now = new Date();
             const year = now.getFullYear();
@@ -383,7 +381,6 @@
                     }
 
                     guardarDatosFichaje(dni, password);
-                    // Opcionalmente auto-sincronizamos también el historial con estos mismos datos por comodidad
                     guardarDatosHistorial(dni, password);
                     document.getElementById('op-dni').value = dni.trim().toUpperCase();
                     document.getElementById('op-password').value = password;
@@ -471,7 +468,7 @@
                         <td>${f.ubicacion}</td>
                         <td><b>${f.tipo}</b></td>
                         <td>${new Date(f.fecha).toLocaleString('es-ES')}${notaModif}</td>
-                        <td><button class="btn-warning" style="padding: 5px; font-size: 11px;" onclick="abrirModalCorreccion('${f.id}')">Corregir</button></td>
+                        <td><button class="btn-warning" style="padding: 5px; font-size: 11px;" onclick="abrirModalCorreccion('${f.id}', '${f.tipo}')">Corregir</button></td>
                     </tr>`;
                 });
             } catch (e) {
@@ -479,8 +476,9 @@
             }
         }
 
-        function abrirModalCorreccion(fichajeId) {
+        function abrirModalCorreccion(fichajeId, tipoActual) {
             document.getElementById('modal-fichaje-id').value = fichajeId;
+            document.getElementById('modal-nuevo-tipo').value = tipoActual; // Preselecciona el tipo actual por comodidad
             document.getElementById('modal-nueva-fecha').value = '';
             document.getElementById('modal-motivo').value = '';
             document.getElementById('modalCorreccion').style.display = 'block';
@@ -494,6 +492,7 @@
             const dni = document.getElementById('op-dni').value;
             const password = document.getElementById('op-password').value;
             const fichajetargetId = document.getElementById('modal-fichaje-id').value;
+            const nuevoTipo = document.getElementById('modal-nuevo-tipo').value; // NUEVO
             const nuevaFechaHoraInput = document.getElementById('modal-nueva-fecha').value;
             const motivo = document.getElementById('modal-motivo').value;
 
@@ -508,14 +507,21 @@
                 const res = await fetch('/api/operario/solicitar-correccion', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dni, password, fichajetargetId, nuevaFechaHora, motivo })
+                    body: JSON.stringify({ 
+                        dni, 
+                        password, 
+                        fichajetargetId, 
+                        nuevoTipo,          // Se envía el nuevo tipo de fichaje seleccionado
+                        nuevaFechaHora, 
+                        motivo 
+                    })
                 });
                 const data = await res.json();
                 if (!res.ok) { alert(data.error); return; }
 
                 alert(data.message);
                 cerrarModal();
-                cargarMiHistorial(); // Refrescar la tabla
+                cargarMiHistorial(); 
             } catch (e) {
                 alert("Error al enviar la solicitud.");
             }
@@ -642,7 +648,7 @@
                 solicitudesGlobalesEmpresario.forEach(s => {
                     tbodySol.innerHTML += `<tr>
                         <td><b>${s.nombre}</b> (${s.dni})</td>
-                        <td>${new Date(s.nuevaFechaHora).toLocaleString('es-ES')}</td>
+                        <td>Cambiado a: <b>${s.nuevoTipo}</b><br>${new Date(s.nuevaFechaHora).toLocaleString('es-ES')}</td>
                         <td>${s.motivo}</td>
                         <td>
                             <button class="btn-success" style="padding: 5px; font-size: 11px; margin-bottom: 4px;" onclick="resolverSolicitud('${s.id}', 'aprobar')">Aprobar</button>
