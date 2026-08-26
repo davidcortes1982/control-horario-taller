@@ -34,7 +34,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const centros = {
     taller: { lat: 36.7213, lon: -4.4214, radioKm: 0.2 }, 
     avanza: { lat: 36.7000, lon: -4.4000, radioKm: 0.2 }, 
-    casa:   { lat: 36.713756, lon: -4.451451, radioKm: 3.0 }   
+    casa:   { lat: 36.7200, lon: -4.4100, radioKm: 3.0 }   
 };
 
 function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
@@ -115,7 +115,7 @@ app.post('/api/fichar', async (req, res) => {
     }
 });
 
-// NUEVA RUTA: Historial personal del operario (Cumple RGPD)
+// RUTA: Historial personal del operario (Sin requerir índice en Firestore)
 app.post('/api/operario/historial', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Introduce tu correo y contraseña." });
@@ -130,9 +130,13 @@ app.post('/api/operario/historial', async (req, res) => {
         const passwordMatch = await bcrypt.compare(password, userSnap.data().password);
         if (!passwordMatch) return res.status(401).json({ error: "Contraseña incorrecta." });
 
-        const snapshot = await db.collection('fichajes').where('email', '==', safeEmail).orderBy('fecha', 'desc').get();
+        // Consultamos solo por email (no requiere índice compuesto en Firebase)
+        const snapshot = await db.collection('fichajes').where('email', '==', safeEmail).get();
         const fichajes = [];
         snapshot.forEach(doc => fichajes.push({ id: doc.id, ...doc.data() }));
+
+        // Ordenamos los fichajes por fecha del más nuevo al más antiguo aquí mismo
+        fichajes.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         res.json({ success: true, fichajes });
     } catch (error) {
@@ -140,10 +144,10 @@ app.post('/api/operario/historial', async (req, res) => {
     }
 });
 
-// NUEVA RUTA: Historial global para el empresario (Inspección de Trabajo)
+// RUTA: Historial global para el empresario (Inspección de Trabajo)
 app.post('/api/empresario/fichajes', async (req, res) => {
     const { password } = req.body;
-    const PASSWORD_EMPRESARIO = "AdminTaller2026*"; // Puedes cambiar esta contraseña de administrador
+    const PASSWORD_EMPRESARIO = "AdminTaller2026*"; 
 
     if (password !== PASSWORD_EMPRESARIO) {
         return res.status(401).json({ error: "Contraseña de empresario incorrecta." });
