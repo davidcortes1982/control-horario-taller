@@ -4,10 +4,14 @@ const path = require('path');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-// Cargar credenciales de Firebase desde variables de entorno (Render) o archivo local (desarrollo)
+// Cargar credenciales de Firebase de forma segura para Render y desarrollo local
 let serviceAccount;
 if (process.env.FIREBASE_CREDENTIALS) {
-    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+    try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+    } catch (e) {
+        console.error("Error al parsear FIREBASE_CREDENTIALS:", e);
+    }
 } else {
     serviceAccount = require('./serviceAccountKey.json');
 }
