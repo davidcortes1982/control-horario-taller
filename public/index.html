@@ -56,6 +56,7 @@
         .btn-success { background-color: #28a745; }
         .btn-info { background-color: #17a2b8; }
         .btn-pdf { background-color: #dc3545; }
+        .btn-secondary { background-color: #6c757d; font-size: 13px; padding: 8px; }
 
         button:active {
             opacity: 0.8;
@@ -135,15 +136,16 @@
 
         <button class="btn-success" onclick="realizarFichaje()">Fichar Ahora</button>
         <button class="btn-primary" onclick="registrarUsuario()">Registrarse (Nuevo)</button>
+        <button class="btn-secondary" onclick="olvidarCredencialesOperario()">Olvidar mis datos guardados en este móvil</button>
         <p id="mensaje-estado" style="font-weight: bold; margin-top: 10px; font-size: 14px;"></p>
     </div>
 
     <!-- Sección de Historial Personal (Operario) -->
     <div class="seccion-card">
         <h3>Mis Fichajes (Operario)</h3>
-        <p style="font-size: 12px; color: #666;">Introduce tu DNI y contraseña para ver tu historial.</p>
-        <input type="text" id="op-dni" placeholder="Tu DNI">
-        <input type="password" id="op-password" placeholder="Tu contraseña">
+        <p style="font-size: 12px; color: #666;">Tus datos se autocompletan solos.</p>
+        <input type="text" id="op-dni" placeholder="Tu DNI" readonly style="background-color: #e9ecef;">
+        <input type="password" id="op-password" placeholder="Tu contraseña" readonly style="background-color: #e9ecef;">
         <button class="btn-info" onclick="cargarMiHistorial()">Ver Mi Historial</button>
         
         <div class="table-responsive">
@@ -187,6 +189,42 @@
     <script>
         let fichajesGlobalesEmpresario = [];
 
+        // Al cargar la página, recuperamos los datos guardados si existen
+        window.onload = function() {
+            const savedDni = localStorage.getItem('taller_dni');
+            const savedPass = localStorage.getItem('taller_pass');
+            const savedAdminPass = localStorage.getItem('taller_admin_pass');
+
+            if (savedDni) {
+                document.getElementById('dni').value = savedDni;
+                document.getElementById('op-dni').value = savedDni;
+            }
+            if (savedPass) {
+                document.getElementById('password').value = savedPass;
+                document.getElementById('op-password').value = savedPass;
+            }
+            if (savedAdminPass) {
+                document.getElementById('admin-password').value = savedAdminPass;
+            }
+        };
+
+        function guardarDatosLocalmente(dni, password) {
+            localStorage.setItem('taller_dni', dni.trim().toUpperCase());
+            localStorage.setItem('taller_pass', password);
+            document.getElementById('op-dni').value = dni.trim().toUpperCase();
+            document.getElementById('op-password').value = password;
+        }
+
+        function olvidarCredencialesOperario() {
+            localStorage.removeItem('taller_dni');
+            localStorage.removeItem('taller_pass');
+            document.getElementById('dni').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('op-dni').value = '';
+            document.getElementById('op-password').value = '';
+            alert("Se han borrado los datos guardados en este dispositivo.");
+        }
+
         function realizarFichaje() {
             const dni = document.getElementById('dni').value;
             const password = document.getElementById('password').value;
@@ -225,6 +263,9 @@
                         return;
                     }
 
+                    // Guardamos los datos automáticamente tras un fichaje exitoso
+                    guardarDatosLocalmente(dni, password);
+
                     msg.style.color = "green";
                     msg.innerText = data.message;
                 } catch (e) {
@@ -262,6 +303,9 @@
                     return;
                 }
 
+                // Guardamos tras registrarse con éxito
+                guardarDatosLocalmente(dni, password);
+
                 msg.style.color = "green";
                 msg.innerText = data.message;
             } catch (e) {
@@ -275,7 +319,7 @@
             const password = document.getElementById('op-password').value;
 
             if (!dni || !password) {
-                alert("Introduce tu DNI y contraseña.");
+                alert("No hay credenciales guardadas. Realiza un fichaje primero.");
                 return;
             }
 
@@ -304,6 +348,11 @@
 
         async function cargarFichajesEmpresario() {
             const password = document.getElementById('admin-password').value;
+            if (!password) {
+                alert("Introduce la contraseña de empresario.");
+                return;
+            }
+
             try {
                 const res = await fetch('/api/empresario/fichajes', {
                     method: 'POST',
@@ -312,6 +361,9 @@
                 });
                 const data = await res.json();
                 if (!res.ok) { alert(data.error); return; }
+
+                // Guardamos la contraseña de administrador para la próxima vez en este dispositivo
+                localStorage.setItem('taller_admin_pass', password);
 
                 fichajesGlobalesEmpresario = data.fichajes;
                 const tbody = document.getElementById('lista-fichajes-body');
