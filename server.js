@@ -32,8 +32,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Coordenadas de tus centros y radios en kilómetros
 const centros = {
-    taller: { lat: 36.7213, lon: -4.4214, radioKm: 0.2 }, 
-    avanza: { lat: 36.7000, lon: -4.4000, radioKm: 0.2 }, 
+    taller: { lat: 36.713519, lon: -4.487414, radioKm: 0.2 }, 
+    avanza: { lat: 36.696515, lon: -4.490930, radioKm: 0.2 }, 
     casa:   { lat: 36.713756, lon: -4.451451, radioKm: 3.0 }   
 };
 
@@ -75,7 +75,7 @@ app.post('/api/registro', async (req, res) => {
     }
 });
 
-// Ruta de fichaje validando DNI y GPS
+// Ruta de fichaje validando DNI, GPS y con la hora exacta de España
 app.post('/api/fichar', async (req, res) => {
     const { dni, password, ubicacion, tipo, latitud, longitud } = req.body;
 
@@ -103,7 +103,9 @@ app.post('/api/fichar', async (req, res) => {
         const passwordMatch = await bcrypt.compare(password, usuario.password);
         if (!passwordMatch) return res.status(401).json({ error: "Contraseña errónea." });
 
-        const fechaActual = new Date().toISOString();
+        // Generamos la fecha exacta adaptada a la hora de España
+        const fechaActual = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Madrid' }).replace(' ', 'T');
+
         await db.collection('fichajes').add({
             dni: safeDni,
             nombre: usuario.nombre,
