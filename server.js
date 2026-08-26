@@ -183,8 +183,8 @@ app.post('/api/operario/historial', async (req, res) => {
 // ==========================================
 app.post('/api/operario/solicitar-correccion', async (req, res) => {
     try {
-        let { dni, password, fichajetargetId, nuevaFechaHora, motivo } = req.body;
-        if (!dni || !password || !fichajetargetId || !nuevaFechaHora || !motivo) {
+        let { dni, password, fichajetargetId, nuevoTipo, nuevaFechaHora, motivo } = req.body;
+        if (!dni || !password || !fichajetargetId || !nuevoTipo || !nuevaFechaHora || !motivo) {
             return res.status(400).json({ error: "Todos los campos de la solicitud son obligatorios." });
         }
         dni = dni.trim().toUpperCase();
@@ -198,6 +198,7 @@ app.post('/api/operario/solicitar-correccion', async (req, res) => {
             fichajeId: fichajetargetId,
             dni,
             nombre: userDoc.data().nombre,
+            nuevoTipo, // <--- Guardamos el nuevo tipo solicitado
             nuevaFechaHora,
             motivo,
             estado: 'pendiente',
@@ -278,6 +279,7 @@ app.post('/api/empresario/resolver-solicitud', async (req, res) => {
             const fichajeRef = db.collection('fichajes').doc(data.fichajeId);
             await fichajeRef.update({
                 fecha: data.nuevaFechaHora,
+                tipo: data.nuevoTipo, // <--- Actualiza también el tipo (entrada/salida) en Firestore
                 modificadoPorEmpresario: true,
                 motivoModificacion: data.motivo,
                 fechaModificacion: new Date().toISOString()
