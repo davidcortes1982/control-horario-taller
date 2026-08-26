@@ -85,14 +85,13 @@
             background-color: #f1f1f1;
         }
 
-        /* Estilos específicos para cuando se imprima o guarde como PDF */
         @media print {
             body {
                 background: white;
                 padding: 0;
             }
             .seccion-card:not(#panel-empresario) {
-                display: none; /* Oculta lo demás al imprimir el informe */
+                display: none;
             }
             #panel-empresario {
                 border: none !important;
@@ -101,7 +100,7 @@
                 padding: 0;
             }
             button, input {
-                display: none !important; /* Oculta botones e inputs en el PDF */
+                display: none !important;
             }
             table {
                 font-size: 11px;
@@ -316,7 +315,7 @@
 
                 fichajesGlobalesEmpresario = data.fichajes;
                 const tbody = document.getElementById('lista-fichajes-body');
-                tbody.innerHTML =';
+                tbody.innerHTML = '';
                 data.fichajes.forEach(f => {
                     tbody.innerHTML += `<tr>
                         <td>${f.dni}</td>
@@ -337,7 +336,6 @@
                 alert("Primero carga los registros con la contraseña de empresario.");
                 return;
             }
-            // Abre la ventana de impresión del navegador, donde seleccionas "Guardar como PDF"
             window.print();
         }
     </script>
