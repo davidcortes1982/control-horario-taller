@@ -31,7 +31,7 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Contraseña de empresario fija
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin1234";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "2727";
 
 // Código secreto para permitir el registro de nuevos operarios
 const CODIGO_REGISTRO_TALLER = process.env.CODIGO_REGISTRO || "taller2026";
@@ -46,9 +46,7 @@ const CENTROS = {
     avanza: [
         { lat: 36.696515, lon: -4.490930, radio: 150 }
     ],
-    casa: [
-        { lat: 36.713756, lon: -4.451451, radio: 150 }
-    ]
+    
 };
 
 // Función para calcular distancia en metros entre dos coordenadas GPS (Fórmula Haversine)
