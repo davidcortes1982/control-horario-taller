@@ -13,7 +13,6 @@ if (process.env.FIREBASE_CREDENTIALS) {
         console.error("Error al parsear FIREBASE_CREDENTIALS:", e);
     }
 } else {
-    // Si estás en desarrollo local y tienes el archivo, lo lee. Si no, avisa.
     try {
         serviceAccount = require('./serviceAccountKey.json');
     } catch (e) {
@@ -34,6 +33,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Contraseña de empresario fija
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin1234";
 
+// Código secreto para permitir el registro de nuevos operarios
+const CODIGO_REGISTRO_TALLER = process.env.CODIGO_REGISTRO || "taller2026";
+
 // ==========================================
 // COORDENADAS FIJAS DE LOS CENTROS (Radio en metros)
 // ==========================================
@@ -45,7 +47,7 @@ const CENTROS = {
         { lat: 36.696515, lon: -4.490930, radio: 150 }
     ],
     casa: [
-        { lat: 36.713756, lon: -4.451451, radio: 150 } // Prueba / Casa con coordenadas activadas
+        { lat: 36.713756, lon: -4.451451, radio: 150 }
     ]
 };
 
@@ -62,14 +64,20 @@ function calcularDistanciaMetros(lat1, lon1, lat2, lon2) {
 }
 
 // ==========================================
-// RUTA: REGISTRAR NUEVO USUARIO / OPERARIO
+// RUTA: REGISTRAR NUEVO USUARIO / OPERARIO (CON CÓDIGO SECRETO)
 // ==========================================
 app.post('/api/registro', async (req, res) => {
     try {
-        let { dni, nombre, password } = req.body;
-        if (!dni || !nombre || !password) {
-            return res.status(400).json({ error: "Todos los campos son obligatorios." });
+        let { dni, nombre, password, codigoEmpresa } = req.body;
+        if (!dni || !nombre || !password || !codigoEmpresa) {
+            return res.status(400).json({ error: "Todos los campos, incluido el código secreto, son obligatorios." });
         }
+
+        // VALIDAR EL CÓDIGO SECRETO DE LA EMPRESA
+        if (codigoEmpresa !== CODIGO_REGISTRO_TALLER) {
+            return res.status(401).json({ error: "El código secreto del taller es incorrecto." });
+        }
+
         dni = dni.trim().toUpperCase();
 
         const userRef = db.collection('usuarios').doc(dni);
@@ -96,13 +104,11 @@ app.post('/api/fichar', async (req, res) => {
         }
         dni = dni.trim().toUpperCase();
 
-        // Validar usuario y contraseña
         const userDoc = await db.collection('usuarios').doc(dni).get();
         if (!userDoc.exists || userDoc.data().password !== password) {
             return res.status(401).json({ error: "DNI o contraseña incorrectos." });
         }
 
-        // VALIDACIÓN RIGUROSA DE GEOLOCALIZACIÓN
         if (latitud === undefined || longitud === undefined || latitud === null || longitud === null) {
             return res.status(400).json({ error: "Se requiere geolocalización activa para realizar cualquier fichaje." });
         }
@@ -132,7 +138,6 @@ app.post('/api/fichar', async (req, res) => {
 
         const nombreUsuario = userDoc.data().nombre;
 
-        // Guardar fichaje con coordenadas y validación exitosa
         await db.collection('fichajes').add({
             dni,
             nombre: nombreUsuario,
@@ -198,7 +203,7 @@ app.post('/api/operario/solicitar-correccion', async (req, res) => {
             fichajeId: fichajetargetId,
             dni,
             nombre: userDoc.data().nombre,
-            nuevoTipo, // <--- Guardamos el nuevo tipo solicitado
+            nuevoTipo,
             nuevaFechaHora,
             motivo,
             estado: 'pendiente',
@@ -279,7 +284,7 @@ app.post('/api/empresario/resolver-solicitud', async (req, res) => {
             const fichajeRef = db.collection('fichajes').doc(data.fichajeId);
             await fichajeRef.update({
                 fecha: data.nuevaFechaHora,
-                tipo: data.nuevoTipo, // <--- Actualiza también el tipo (entrada/salida) en Firestore
+                tipo: data.nuevoTipo,
                 modificadoPorEmpresario: true,
                 motivoModificacion: data.motivo,
                 fechaModificacion: new Date().toISOString()

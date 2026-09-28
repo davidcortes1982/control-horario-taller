@@ -161,6 +161,7 @@
         <input type="text" id="dni" placeholder="DNI / NIE (Ej: 12345678A)">
         <input type="text" id="nombre" placeholder="Nombre y Apellidos (Solo para registrarse)">
         <input type="password" id="password" placeholder="Contraseña">
+        <input type="password" id="codigo-empresa" placeholder="Código secreto de registro (Solo para nuevos registros)">
         
         <select id="ubicacion">
             <option value="taller">Taller Principal</option>
@@ -338,6 +339,7 @@
             document.getElementById('dni').value = '';
             document.getElementById('nombre').value = '';
             document.getElementById('password').value = '';
+            document.getElementById('codigo-empresa').value = '';
             document.getElementById('mensaje-estado').innerText = '';
             alert("Se han borrado los datos de registro de este dispositivo.");
         }
@@ -401,10 +403,11 @@
             const dni = document.getElementById('dni').value;
             const nombre = document.getElementById('nombre').value;
             const password = document.getElementById('password').value;
+            const codigoEmpresa = document.getElementById('codigo-empresa').value;
             const msg = document.getElementById('mensaje-estado');
 
-            if (!dni || !nombre || !password) {
-                alert("Introduce DNI, Nombre completo y contraseña para registrarte.");
+            if (!dni || !nombre || !password || !codigoEmpresa) {
+                alert("Introduce DNI, Nombre completo, contraseña y el código secreto de la empresa.");
                 return;
             }
 
@@ -412,7 +415,7 @@
                 const res = await fetch('/api/registro', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dni, nombre, password })
+                    body: JSON.stringify({ dni, nombre, password, codigoEmpresa })
                 });
                 const data = await res.json();
                 
@@ -478,7 +481,7 @@
 
         function abrirModalCorreccion(fichajeId, tipoActual) {
             document.getElementById('modal-fichaje-id').value = fichajeId;
-            document.getElementById('modal-nuevo-tipo').value = tipoActual; // Preselecciona el tipo actual por comodidad
+            document.getElementById('modal-nuevo-tipo').value = tipoActual;
             document.getElementById('modal-nueva-fecha').value = '';
             document.getElementById('modal-motivo').value = '';
             document.getElementById('modalCorreccion').style.display = 'block';
@@ -492,7 +495,7 @@
             const dni = document.getElementById('op-dni').value;
             const password = document.getElementById('op-password').value;
             const fichajetargetId = document.getElementById('modal-fichaje-id').value;
-            const nuevoTipo = document.getElementById('modal-nuevo-tipo').value; // NUEVO
+            const nuevoTipo = document.getElementById('modal-nuevo-tipo').value;
             const nuevaFechaHoraInput = document.getElementById('modal-nueva-fecha').value;
             const motivo = document.getElementById('modal-motivo').value;
 
@@ -511,7 +514,7 @@
                         dni, 
                         password, 
                         fichajetargetId, 
-                        nuevoTipo,          // Se envía el nuevo tipo de fichaje seleccionado
+                        nuevoTipo, 
                         nuevaFechaHora, 
                         motivo 
                     })
